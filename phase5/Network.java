@@ -7,7 +7,7 @@ class Network
 	private static int nextAddress = 0;
 	public static boolean reorder = false; // Can packets be reordered?
 	public static double lossRate = 0.0; // Random packet loss
-	// FIXME: duplication
+	// FIXME: random packet duplication
 	
 	// Deliver a packet to an address
 	public static void deliver (Packet p)
@@ -17,13 +17,13 @@ class Network
 		// If the network allows reordering, randomise the latency a bit
 		if (reorder) p.latency *= (0.95 + Math.random() * 0.1);
 		if (Math.random() < lossRate) {
-			Event.log ("packet lost by network");
+			Event.log (p + " lost by network");
 			return;
 		}
 		// Schedule the arrival of the packet at the destination
-		Event.schedule (ni, p.latency, NetworkInterface.RX_Q_ADD, p);
+		Event.schedule (ni, p.latency, NetworkInterface.RX_QUEUE, p);
 	}
-
+	
 	// Attach an interface to the network - returns the address
 	public static int register (NetworkInterface ni)
 	{

@@ -1,6 +1,6 @@
 // Interesting parameters to play with: txSpeed and rxSpeed, retransmission
-// timeout, window size, AIMD increase and decrease (Peer.java), queue size
-// (NetworkInterface.java), packet size (Node.java).
+// timeout, window sizes, AIMD increase and decrease (Peer.java), queue sizes
+// (NetworkInterface.java), packet size (Packet.java).
 
 class Sim
 {
@@ -15,18 +15,15 @@ class Sim
 		
 		Node n0 = new Node (txSpeed, rxSpeed);
 		Node n1 = new Node (txSpeed, rxSpeed);
-		// Node n2 = new Node (txSpeed, rxSpeed);
+		Node n2 = new Node (txSpeed, rxSpeed);
+		Node n3 = new Node (txSpeed, rxSpeed);
 		
-		n0.connect (n1, 0.1);
-		// n0.connect (n2, 0.1);
-		n1.connect (n0, 0.1);
-		// n1.connect (n2, 0.1);
-		// n2.connect (n0, 0.1);
-		// n2.connect (n1, 0.1);
+		n0.connectBothWays (n1, 0.1);
+		n1.connectBothWays (n2, 0.1);
+		n1.connectBothWays (n3, 0.1);
+		n2.connectBothWays (n3, 0.1);
 		
-		Event.schedule (n0, Math.random(), Node.SEND_MESSAGES, null);
-		// Event.schedule (n1, Math.random(), Node.SEND_MESSAGES, null);
-		// Event.schedule (n2, Math.random(), Node.SEND_MESSAGES, null);
+		Event.schedule (n0, 0.0, Node.GENERATE_REQUEST, null);
 		
 		// Run the simulation
 		Event.run();
