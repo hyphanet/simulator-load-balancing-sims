@@ -35,7 +35,6 @@ class Peer implements EventTarget
 	private LinkedList<DataPacket> txBuffer; // Retransmission buffer
 	private LinkedList<Message> txQueue; // Messages waiting to be sent
 	private int txQueueSize = 0; // Size of transmission queue in bytes
-	private int txHeadSize = 0; // Size of first message in transmission q
 	
 	// Receiver state
 	private int rxSeq = 0; // Sequence number of next in-order packet
@@ -59,7 +58,6 @@ class Peer implements EventTarget
 		log (m + " added to transmission queue");
 		// Warning: until token-passing is implemented the length of
 		// the transmission queue is unlimited
-		if (txQueue.isEmpty()) txHeadSize = m.size;
 		txQueue.add (m);
 		txQueueSize += m.size;
 		log (txQueue.size() + " messages in transmission queue");
@@ -75,23 +73,6 @@ class Peer implements EventTarget
 			return false;
 		}
 		
-		// Work out how large a packet we can send
-		int payload = Packet.MAX_PAYLOAD;
-		if (payload > txQueueSize) payload = txQueueSize;
-		if (payload > cwind - inflight - Packet.HEADER_SIZE)
-			payload = (int) cwind - inflight - Packet.HEADER_SIZE;
-		
-		if (payload < txHeadSize) {
-			log ("no room in congestion window");
-			return false;
-		}
-		
-		// Nagle's algorithm - try to coalesce small packets
-		if (payload < Packet.SENSIBLE_PAYLOAD && inflight > 0) {
-			log ("delaying transmission of " + payload + " bytes");
-			return false;
-		}
-		
 		// Return to slow start when the link is idle
 		double now = Event.time();
 		if (now - lastTransmission > RTO * rtt) {
@@ -101,22 +82,39 @@ class Peer implements EventTarget
 		}
 		lastTransmission = now;
 		
+		if (cwind - inflight <= Packet.HEADER_SIZE) {
+			log ("no room in congestion window");
+			return false;
+		}
+		
+		// Work out how large a packet we can send
+		int payload = Packet.MAX_PAYLOAD;
+		if (payload > txQueueSize) payload = txQueueSize;
+		if (payload > cwind - inflight - Packet.HEADER_SIZE)
+			payload = (int) cwind - inflight - Packet.HEADER_SIZE;
+		
+		// Nagle's algorithm - try to coalesce small packets
+		if (payload < Packet.SENSIBLE_PAYLOAD && inflight > 0) {
+			log ("delaying transmission of " + payload + " bytes");
+			return false;
+		}
+		
 		// Put as many messages as possible in the packet
 		DataPacket p = new DataPacket (payload);
-		while (payload >= txHeadSize) {
-			try {
-				Message m = txQueue.removeFirst();
-				p.addMessage (m);
-				payload -= txHeadSize;
-				txQueueSize -= txHeadSize;
-				// Move on to the next message
-				txHeadSize = txQueue.getFirst().size;
-			}
-			catch (NoSuchElementException nse) {
-				// No more messages in the txQueue
-				txHeadSize = 0;
-				break;
-			}
+		Iterator<Message> i = txQueue.iterator();
+		while (i.hasNext()) {
+			Message m = i.next();
+			if (m.size > payload) break;
+			i.remove();
+			txQueueSize -= m.size;
+			p.addMessage (m);
+			payload -= m.size;
+		}
+		
+		// Don't send empty packets
+		if (p.messages == null) {
+			log ("message too large for congestion window");
+			return false;
 		}
 		
 		// Send the packet
