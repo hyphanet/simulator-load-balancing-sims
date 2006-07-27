@@ -9,9 +9,6 @@ class Peer implements EventTarget
 	public double location; // The remote node's routing location
 	private double latency; // The latency of the connection in seconds
 	
-	// Nagle's algorithm
-	public final static int SENSIBLE_PAYLOAD = 1000; // Minimum packet size
-	
 	// Retransmission parameters
 	public final static double TIMER = 0.5; // Coarse-grained timer, seconds
 	public final static double RTO = 4.0; // Retransmission timeout in RTTs
@@ -78,8 +75,20 @@ class Peer implements EventTarget
 			return false;
 		}
 		
-		if (cwind - inflight <= Packet.HEADER_SIZE) {
+		// Work out how large a packet we can send
+		int payload = Packet.MAX_PAYLOAD;
+		if (payload > txQueueSize) payload = txQueueSize;
+		if (payload > cwind - inflight - Packet.HEADER_SIZE)
+			payload = (int) cwind - inflight - Packet.HEADER_SIZE;
+		
+		if (payload < txHeadSize) {
 			log ("no room in congestion window");
+			return false;
+		}
+		
+		// Nagle's algorithm - try to coalesce small packets
+		if (payload < Packet.SENSIBLE_PAYLOAD && inflight > 0) {
+			log ("delaying transmission of " + payload + " bytes");
 			return false;
 		}
 		
@@ -91,18 +100,6 @@ class Peer implements EventTarget
 			slowStart = true;
 		}
 		lastTransmission = now;
-		
-		// Work out how large a packet we can send
-		int payload = Packet.MAX_PAYLOAD;
-		if (payload > txQueueSize) payload = txQueueSize;
-		if (payload > cwind - inflight - Packet.HEADER_SIZE)
-			payload = (int) cwind - inflight - Packet.HEADER_SIZE;
-		
-		// Nagle's algorithm - try to coalesce small packets
-		if (payload < SENSIBLE_PAYLOAD && inflight > 0) {
-			log ("delaying transmission of " + payload + " bytes");
-			return false;
-		}
 		
 		// Put as many messages as possible in the packet
 		DataPacket p = new DataPacket (payload);
@@ -208,14 +205,14 @@ class Peer implements EventTarget
 	
 	private void handleAck (Ack a)
 	{
-		log ("received ack " + a.seq);
+		log ("received ack " + a.ack);
 		double now = Event.time();
 		Iterator<DataPacket> i = txBuffer.iterator();
 		while (i.hasNext()) {
 			DataPacket p = i.next();
 			double age = now - p.sent;
 			// Explicit ack
-			if (p.seq == a.seq) {
+			if (p.seq == a.ack) {
 				log ("packet " + p.seq + " acknowledged");
 				i.remove();
 				inflight -= p.size;
@@ -232,7 +229,7 @@ class Peer implements EventTarget
 				break;
 			}
 			// Fast retransmission
-			if (p.seq < a.seq && age > FRTO * rtt) {
+			if (p.seq < a.ack && age > FRTO * rtt) {
 				p.sent = now;
 				log ("fast retransmitting packet " + p.seq);
 				log (inflight + " bytes in flight");
@@ -265,7 +262,7 @@ class Peer implements EventTarget
 	
 	private void log (String message)
 	{
-		// Event.log (node.net.address + ":" + address + " " + message);
+		Event.log (node.net.address + ":" + address + " " + message);
 	}
 	
 	// Event callback

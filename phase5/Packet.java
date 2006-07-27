@@ -4,17 +4,18 @@ import java.util.ArrayList;
 
 abstract class Packet
 {
-	public final static int HEADER_SIZE = 50;
+	public final static int HEADER_SIZE = 80; // Including IP & UDP headers
 	public final static int MAX_PAYLOAD = 1400;
+	public final static int SENSIBLE_PAYLOAD = 1000; // Nagle's algorithm
 	
 	public int src, dest; // Network addresses
 	public int size; // Packet size in bytes, including headers
-	public int seq; // Sequence number or explicit ack
 	public double latency; // Link latency (stored here for convenience)
 }
 
 class DataPacket extends Packet
 {
+	public int seq; // Sequence number
 	public ArrayList<Message> messages = null; // Payload	
 	public double sent; // Time at which the packet was (re)transmitted
 	
@@ -23,14 +24,7 @@ class DataPacket extends Packet
 		size = dataSize + HEADER_SIZE;
 	}
 	
-	/*
-	In real life the payload would be an array of bytes, but here the 
-	payload is represented by an ArrayList of Messages. A large message can
-	be split across more than one packet, in which case the message only
-	appears in the payload of the *last* packet. This means it's possible
-	for a full packet to have an apparently empty payload.
-	*/
-	
+	// In real life the payload would be an array of bytes
 	public void addMessage (Message m)
 	{
 		if (messages == null) messages = new ArrayList<Message>();
@@ -40,9 +34,11 @@ class DataPacket extends Packet
 
 class Ack extends Packet
 {
-	public Ack (int seq)
+	public int ack; // Explicit ack of a DataPacket's sequence number
+	
+	public Ack (int ack)
 	{
 		size = HEADER_SIZE;
-		this.seq = seq;
+		this.ack = ack;
 	}
 }
