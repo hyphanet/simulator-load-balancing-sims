@@ -172,10 +172,9 @@ class Peer
 		}
 		else if (p.seq < rxSeq + MAX_INFLIGHT) {
 			log ("packet out of order - expected " + rxSeq);
-			rxDupe.add (p.seq);
-			// Deliver the packet
-			unpack (p);
-			sendAck (p.seq);
+			if (rxDupe.add (p.seq)) unpack (p);
+			else log ("duplicate packet");
+			sendAck (p.seq); // Original ack may have been lost
 		}
 		// This indicates a misbehaving sender - discard the packet
 		else log ("warning: received " + p.seq + " before " + rxSeq);
