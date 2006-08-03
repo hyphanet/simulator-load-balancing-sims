@@ -17,8 +17,6 @@ class Peer
 	// Congestion control parameters
 	public final static int MIN_CWIND = 3000; // Minimum congestion window
 	public final static int MAX_CWIND = 100000; // Maximum congestion window
-	// Note: RWIND must be at least 2 * FRTO * MAX_CWIND
-	public final static int RWIND = 400000; // Maximum bytes buffered at rx
 	public final static double ALPHA = 0.1615; // AIMD increase parameter
 	public final static double BETA = 0.9375; // AIMD decrease parameter
 	public final static double GAMMA = 3.0; // Slow start divisor
