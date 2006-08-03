@@ -1,9 +1,9 @@
 class Response extends Message
 {
 	public final int id; // The unique ID of the request
-	public final double key; // The requested key (as a routing location)
+	public final int key; // The requested key
 	
-	public Response (int id, double key)
+	public Response (int id, int key)
 	{
 		this.id = id;
 		this.key = key;

@@ -1,5 +1,4 @@
 import java.util.LinkedList;
-import java.util.NoSuchElementException;
 
 class NetworkInterface implements EventTarget
 {
@@ -72,13 +71,10 @@ class NetworkInterface implements EventTarget
 	{
 		log ("finished receiving " + p);
 		node.handlePacket (p);
+		rxQueueSize -= p.size;
+		rxQueue.remove (p);
 		// If there's another packet waiting, start to receive it
-		try {
-			rxQueueSize -= p.size;
-			rxQueue.remove (p);
-			rxStart (rxQueue.getFirst());
-		}
-		catch (NoSuchElementException nse) {}
+		if (!rxQueue.isEmpty()) rxStart (rxQueue.peek());
 	}
 	
 	// Start transmitting a packet
@@ -94,13 +90,10 @@ class NetworkInterface implements EventTarget
 	{
 		log ("finished transmitting " + p);
 		Network.deliver (p);
+		txQueueSize -= p.size;
+		txQueue.remove (p);
 		// If there's another packet waiting, start to transmit it
-		try {
-			txQueueSize -= p.size;
-			txQueue.remove (p);
-			txStart (txQueue.getFirst());
-		}
-		catch (NoSuchElementException nse) {}
+		if (!txQueue.isEmpty()) txStart (txQueue.peek());
 	}
 	
 	private void log (String message)

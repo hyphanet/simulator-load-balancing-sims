@@ -3,13 +3,17 @@ import java.util.HashSet;
 
 class Node implements EventTarget
 {
+	public final static double RETX_TIMER = 0.1; // Coarse-grained timer
+	public final static int STORE_SIZE = 10; // Max number of keys in store
+	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
 	private int requestsGenerated = 0;
 	private HashSet<Integer> recentlySeenRequests; // Request IDs
 	private HashMap<Integer,RequestState> outstandingRequests;
-	public HashSet<Double> cache; // Datastore containing keys
+	public LruCache<Integer> cache; // Datastore containing keys
+	private boolean timerRunning = false; // Is the retx timer running?
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -18,7 +22,7 @@ class Node implements EventTarget
 		peers = new HashMap<Integer,Peer>();
 		recentlySeenRequests = new HashSet<Integer>();
 		outstandingRequests = new HashMap<Integer,RequestState>();
-		cache = new HashSet<Double>();
+		cache = new LruCache<Integer> (STORE_SIZE);
 	}
 	
 	public void connect (Node n, double latency)
@@ -38,6 +42,27 @@ class Node implements EventTarget
 	{
 		if (a > b) return Math.min (a - b, b - a + 1.0);
 		else return Math.min (b - a, a - b + 1.0);
+	}
+	
+	// Convert an integer key to a routing location
+	public static double keyToLocation (int key)
+	{
+		return key / (double) Integer.MAX_VALUE;
+	}
+	
+	// Convert a routing location to an integer key
+	public static int locationToKey (double location)
+	{
+		return (int) (location * Integer.MAX_VALUE);
+	}
+	
+	// Called by Peer
+	public void startTimer()
+	{
+		if (timerRunning) return;
+		log ("starting retransmission timer");
+		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
+		timerRunning = true;
 	}
 	
 	// Called by NetworkInterface
@@ -71,7 +96,7 @@ class Node implements EventTarget
 			if (rs != null) rs.nexts.remove (prev);
 			return;
 		}
-		if (cache.contains (r.key)) {
+		if (cache.get (r.key)) {
 			log ("key " + r.key + " found in cache");
 			if (prev == null)
 				log (r + " succeeded locally");
@@ -89,7 +114,7 @@ class Node implements EventTarget
 			log ("unexpected " + r);
 			return;
 		}
-		cache.add (r.key);
+		cache.put (r.key);
 		if (rs.prev == null) log (rs + " succeeded");
 		else {
 			log ("forwarding " + r);
@@ -133,19 +158,37 @@ class Node implements EventTarget
 	{
 		if (requestsGenerated++ > 1000) return;
 		// Send a request to a random location
-		Request r = new Request (0.1);
+		Request r = new Request (123456);
 		log ("generating request " + r.id);
 		handleRequest (r, null);
 		// Schedule the next request
-		// Event.schedule (this, Math.random(), GENERATE_REQUEST, null);
+		Event.schedule (this, 0.01, GENERATE_REQUEST, null);
+	}
+	
+	// Event callback
+	private void checkTimeouts()
+	{
+		boolean stopTimer = true;
+		for (Peer p : peers.values())
+			if (p.checkTimeouts()) stopTimer = false;
+		if (stopTimer) {
+			log ("stopping retransmission timer");
+			timerRunning = false;
+		}
+		else {
+			Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
+			timerRunning = true;
+		}
 	}
 	
 	// EventTarget interface
 	public void handleEvent (int type, Object data)
 	{
 		if (type == GENERATE_REQUEST) generateRequest();
+		else if (type == CHECK_TIMEOUTS) checkTimeouts();
 	}
 	
 	// Each EventTarget class has its own event codes
 	public final static int GENERATE_REQUEST = 1;
+	public final static int CHECK_TIMEOUTS = 2;
 }

@@ -3,10 +3,10 @@ class Request extends Message
 	private static int nextId = 0;
 	
 	public final int id; // The unique ID of the request
-	public final double key; // The requested key (as a routing location)
+	public final int key; // The requested key
 	
 	// Start a new request
-	public Request (double key)
+	public Request (int key)
 	{
 		id = nextId++;
 		this.key = key;
@@ -14,7 +14,7 @@ class Request extends Message
 	}
 	
 	// Forward a request
-	public Request (int id, double key)
+	public Request (int id, int key)
 	{
 		this.id = id;
 		this.key = key;

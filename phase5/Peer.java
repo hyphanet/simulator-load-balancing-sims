@@ -2,7 +2,7 @@ import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-class Peer implements EventTarget
+class Peer
 {
 	private Node node; // The local node
 	public int address; // The remote node's address
@@ -10,7 +10,6 @@ class Peer implements EventTarget
 	private double latency; // The latency of the connection in seconds
 	
 	// Retransmission parameters
-	public final static double TIMER = 0.5; // Coarse-grained timer, seconds
 	public final static double RTO = 4.0; // Retransmission timeout in RTTs
 	public final static double FRTO = 1.5; // Fast retx timeout in RTTs
 	public final static double RTT_DECAY = 0.9; // Exp moving average
@@ -29,7 +28,7 @@ class Peer implements EventTarget
 	private boolean slowStart = true; // Are we in the slow start phase?
 	private double rtt = 3.0; // Estimated round-trip time in seconds
 	private double lastTransmission = 0.0; // Clock time
-	private boolean timerRunning = false; // Is the retx timer running?
+	private double lastLeftSlowStart = 0.0; // Clock time
 	private int inflight = 0; // Bytes sent but not acked
 	private int txSeq = 0; // Sequence number of next outgoing packet
 	private LinkedList<DataPacket> txBuffer; // Retransmission buffer
@@ -126,12 +125,8 @@ class Peer implements EventTarget
 		inflight += p.size;
 		log (inflight + " bytes in flight");
 		txBuffer.add (p);
-		// Start the coarse-grained retransmission timer if necessary
-		if (!timerRunning) {
-			log ("starting retransmission timer");
-			Event.schedule (this, TIMER, CHECK_TIMEOUTS, null);
-			timerRunning = true;
-		}
+		// Start the node's retransmission timer if necessary
+		node.startTimer();
 		return true;
 	}
 	
@@ -248,6 +243,7 @@ class Peer implements EventTarget
 		if (slowStart) {
 			log ("leaving slow start");
 			slowStart = false;
+			lastLeftSlowStart = now;
 		}
 	}
 	
@@ -263,15 +259,13 @@ class Peer implements EventTarget
 		Event.log (node.net.address + ":" + address + " " + message);
 	}
 	
-	// Event callback
-	private void checkTimeouts()
+	// Called by Node
+	public boolean checkTimeouts()
 	{
 		log ("checking timeouts");
-		// If there are no packets in flight, stop the timer
 		if (txBuffer.isEmpty()) {
-			log ("stopping retransmission timer");
-			timerRunning = false;
-			return;
+			log ("no packets in flight");
+			return false;
 		}
 		double now = Event.time();
 		for (DataPacket p : txBuffer) {
@@ -281,20 +275,19 @@ class Peer implements EventTarget
 				log ("retransmitting packet " + p.seq);
 				log (inflight + " bytes in flight");
 				node.net.send (p, address, latency);
-				// Note: TCP would return to slow start
-				decreaseCongestionWindow (now);
+				// Return to slow start
+				if (!slowStart &&
+				now - lastLeftSlowStart > RTO * rtt) {
+					log ("returning to slow start");
+					cwind = MIN_CWIND;
+					slowStart = true;
+				}
+				else {
+					log ("not returning to slow start");
+					decreaseCongestionWindow (now);
+				}
 			}
 		}
-		// Reset the timer
-		Event.schedule (this, TIMER, CHECK_TIMEOUTS, null);
+		return true;
 	}
-	
-	// EventTarget interface
-	public void handleEvent (int type, Object data)
-	{
-		if (type == CHECK_TIMEOUTS) checkTimeouts();
-	}
-	
-	// Each EventTarget class has its own event codes
-	private final static int CHECK_TIMEOUTS = 1;
 }
