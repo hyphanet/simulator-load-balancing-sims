@@ -2,26 +2,27 @@
 
 import java.util.ArrayList;
 
-abstract class Packet
+class Packet
 {
 	public final static int HEADER_SIZE = 80; // Including IP & UDP headers
-	public final static int MAX_PAYLOAD = 1400;
+	public final static int ACK_SIZE = 4; // Size of a sequence num in bytes
+	public final static int MAX_SIZE = 1450; // MTU including headers
 	public final static int SENSIBLE_PAYLOAD = 1000; // Nagle's algorithm
 	
 	public int src, dest; // Network addresses
-	public int size; // Packet size in bytes, including headers
-	public double latency; // Link latency (stored here for convenience)
-}
-
-class DataPacket extends Packet
-{
-	public int seq; // Sequence number
-	public ArrayList<Message> messages = null; // Payload	
-	public double sent; // Time at which the packet was (re)transmitted
+	public int size = HEADER_SIZE; // Size in bytes, including headers
+	public int seq = -1; // Data sequence number (-1 if no data)
+	public ArrayList<Integer> acks = null; // Sequence numbers of acked pkts
+	public ArrayList<Message> messages = null; // Payload
 	
-	public DataPacket (int dataSize)
+	public double sent; // Time at which the packet was (re) transmitted
+	public double latency; // Link latency (stored here for convenience)
+	
+	public void addAck (Integer seq)
 	{
-		size = dataSize + HEADER_SIZE;
+		if (acks == null) acks = new ArrayList<Integer>();
+		acks.add (seq);
+		size += ACK_SIZE;
 	}
 	
 	// In real life the payload would be an array of bytes
@@ -29,16 +30,6 @@ class DataPacket extends Packet
 	{
 		if (messages == null) messages = new ArrayList<Message>();
 		messages.add (m);
-	}
-}
-
-class Ack extends Packet
-{
-	public int ack; // Explicit ack of a DataPacket's sequence number
-	
-	public Ack (int ack)
-	{
-		size = HEADER_SIZE;
-		this.ack = ack;
+		size += m.size;
 	}
 }
