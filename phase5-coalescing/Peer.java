@@ -21,9 +21,8 @@ class Peer
 	public final static double BETA = 0.9375; // AIMD decrease parameter
 	public final static double GAMMA = 3.0; // Slow start divisor
 	
-	// Coalescing parameters
-	public final static double COALESCE_DATA = 0.1; // Max delay in seconds
-	public final static double COALESCE_ACK = 0.1;
+	// Coalescing
+	public final static double COALESCE = 0.1; // Max delay in seconds
 	
 	// Out-of-order delivery with eventual detection of missing packets
 	public final static int SEQ_RANGE = 1000; // Packets
@@ -66,9 +65,11 @@ class Peer
 		// Warning: until token-passing is implemented the length of
 		// the transmission queue is unlimited
 		double now = Event.time();
-		msgQueue.add (new Deadline<Message> (m, now + COALESCE_DATA));
+		msgQueue.add (new Deadline<Message> (m, now + COALESCE));
 		msgQueueSize += m.size;
 		log (msgQueue.size() + " messages in transmission queue");
+		// Start the node's timer if necessary
+		node.startTimer();
 		// Send as many packets as possible
 		while (send());
 	}
@@ -100,15 +101,8 @@ class Peer
 		if (payload > msgQueueSize) payload = msgQueueSize;
 		if (payload > window) payload = window;
 		
-		// Work out when the first ack or message needs to be sent
-		double deadline = Double.POSITIVE_INFINITY;
-		Deadline<Integer> ack = ackQueue.peek();
-		if (ack != null) deadline = ack.deadline;
-		Deadline<Message> msg = msgQueue.peek();
-		if (msg != null) deadline = Math.min (deadline, msg.deadline);
-		
 		// Delay small packets for coalescing
-		if (payload < Packet.SENSIBLE_PAYLOAD && now < deadline) {
+		if (payload < Packet.SENSIBLE_PAYLOAD && now < deadline()) {
 			log ("delaying transmission of " + payload + " bytes");
 			return false;
 		}
@@ -148,8 +142,6 @@ class Peer
 			inflight += p.size; // Acks aren't congestion-controlled
 			log (inflight + " bytes in flight");
 			txBuffer.add (p);
-			// Start the node's retransmission timer if necessary
-			node.startTimer();
 		}
 		
 		// Send the packet
@@ -161,9 +153,12 @@ class Peer
 	private void sendAck (int seq)
 	{
 		double now = Event.time();
-		ackQueue.add (new Deadline<Integer> (seq, now + COALESCE_ACK));
+		ackQueue.add (new Deadline<Integer> (seq, now + COALESCE));
 		ackQueueSize += Packet.ACK_SIZE;
-		send();
+		// Start the node's timer if necessary
+		node.startTimer();
+		// Send as many packets as possible
+		while (send());
 	}
 	
 	// Called by Node when a packet arrives
@@ -262,19 +257,31 @@ class Peer
 		for (Message m : p.messages) node.handleMessage (m, this);
 	}
 	
+	// Work out when the first ack or message needs to be sent
+	private double deadline()
+	{
+		double deadline = Double.POSITIVE_INFINITY;
+		Deadline<Integer> ack = ackQueue.peek();
+		if (ack != null) deadline = ack.deadline;
+		Deadline<Message> msg = msgQueue.peek();
+		if (msg != null) deadline = Math.min (deadline, msg.deadline);
+		return deadline;
+	}
+	
 	private void log (String message)
 	{
 		Event.log (node.net.address + ":" + address + " " + message);
 	}
 	
-	// Called by Node
-	public boolean checkTimeouts()
+	// Called by Node, returns the next coalescing or retx deadline
+	public double checkTimeouts()
 	{
 		log ("checking timeouts");
-		send(); // Consider sending delayed packets
+		// Send as many packets as possible
+		while (send());
 		if (txBuffer.isEmpty()) {
 			log ("no packets in flight");
-			return false;
+			return deadline();
 		}
 		double now = Event.time();
 		for (Packet p : txBuffer) {
@@ -297,6 +304,6 @@ class Peer
 				}
 			}
 		}
-		return true;
+		return Math.min (now + COALESCE, deadline());
 	}
 }

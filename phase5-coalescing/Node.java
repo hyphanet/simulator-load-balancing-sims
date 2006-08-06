@@ -3,8 +3,8 @@ import java.util.HashSet;
 
 class Node implements EventTarget
 {
-	public final static double RETX_TIMER = 0.1; // Coarse-grained timer
 	public final static int STORE_SIZE = 10; // Max number of keys in store
+	public final static double MIN_SLEEP = 0.01; // Seconds
 	
 	public double location; // Routing location
 	public NetworkInterface net;
@@ -13,7 +13,7 @@ class Node implements EventTarget
 	private HashSet<Integer> recentlySeenRequests; // Request IDs
 	private HashMap<Integer,RequestState> outstandingRequests;
 	public LruCache<Integer> cache; // Datastore containing keys
-	private boolean timerRunning = false; // Is the retx timer running?
+	private boolean timerRunning = false; // Is the timer running?
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -60,8 +60,8 @@ class Node implements EventTarget
 	public void startTimer()
 	{
 		if (timerRunning) return;
-		log ("starting retransmission timer");
-		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
+		log ("starting retransmission/coalescing timer");
+		Event.schedule (this, Peer.COALESCE, CHECK_TIMEOUTS, null);
 		timerRunning = true;
 	}
 	
@@ -162,21 +162,24 @@ class Node implements EventTarget
 		log ("generating request " + r.id);
 		handleRequest (r, null);
 		// Schedule the next request
-		Event.schedule (this, 0.05, GENERATE_REQUEST, null);
+		Event.schedule (this, 0.049, GENERATE_REQUEST, null);
 	}
 	
 	// Event callback
 	private void checkTimeouts()
 	{
-		boolean stopTimer = true;
+		double deadline = Double.POSITIVE_INFINITY;
 		for (Peer p : peers.values())
-			if (p.checkTimeouts()) stopTimer = false;
-		if (stopTimer) {
-			log ("stopping retransmission timer");
+			deadline = Math.min (deadline, p.checkTimeouts());
+		if (deadline == Double.POSITIVE_INFINITY) {
+			log ("stopping retransmission/coalescing timer");
 			timerRunning = false;
 		}
 		else {
-			Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
+			double sleep = deadline - Event.time();
+			if (sleep < MIN_SLEEP) sleep = MIN_SLEEP;
+			log ("sleeping for " + sleep + " seconds");
+			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);
 			timerRunning = true;
 		}
 	}
