@@ -21,8 +21,12 @@ class Peer
 	public final static double BETA = 0.9375; // AIMD decrease parameter
 	public final static double GAMMA = 3.0; // Slow start divisor
 	
+	// Coalescing parameters
+	public final static double COALESCE_DATA = 0.1; // Max delay in seconds
+	public final static double COALESCE_ACK = 0.1;
+	
 	// Out-of-order delivery with eventual detection of missing packets
-	public final static int MAX_INFLIGHT = 1000; // Packets
+	public final static int SEQ_RANGE = 1000; // Packets
 	
 	// Sender state
 	private double cwind = MIN_CWIND; // Congestion window in bytes
@@ -31,12 +35,12 @@ class Peer
 	private double lastTransmission = 0.0; // Clock time
 	private double lastLeftSlowStart = 0.0; // Clock time
 	private int inflight = 0; // Bytes sent but not acked
-	private int txSeq = 0; // Sequence number of next outgoing packet
-	private int txMaxSeq = MAX_INFLIGHT - 1; // Highest sequence number
+	private int txSeq = 0; // Sequence number of next outgoing data packet
+	private int txMaxSeq = SEQ_RANGE - 1; // Highest sequence number
 	private LinkedList<Packet> txBuffer; // Retransmission buffer
-	private LinkedList<Message> msgQueue; // Messages waiting to be sent
+	private LinkedList<Deadline<Message>> msgQueue; // Outgoing messages
 	private int msgQueueSize = 0; // Size of message queue in bytes
-	private LinkedList<Integer> ackQueue; // Acks waiting to be sent
+	private LinkedList<Deadline<Integer>> ackQueue; // Outgoing acks
 	private int ackQueueSize = 0; // Size of ack queue in bytes
 	
 	// Receiver state
@@ -50,8 +54,8 @@ class Peer
 		this.location = location;
 		this.latency = latency;
 		txBuffer = new LinkedList<Packet>();
-		msgQueue = new LinkedList<Message>();
-		ackQueue = new LinkedList<Integer>();
+		msgQueue = new LinkedList<Deadline<Message>>();
+		ackQueue = new LinkedList<Deadline<Integer>>();
 		rxDupe = new HashSet<Integer>();
 	}
 	
@@ -61,15 +65,16 @@ class Peer
 		log (m + " added to transmission queue");
 		// Warning: until token-passing is implemented the length of
 		// the transmission queue is unlimited
-		msgQueue.add (m);
+		double now = Event.time();
+		msgQueue.add (new Deadline<Message> (m, now + COALESCE_DATA));
 		msgQueueSize += m.size;
 		log (msgQueue.size() + " messages in transmission queue");
-		// Send as many packets as possible, using Nagle
-		while (send (true));
+		// Send as many packets as possible
+		while (send());
 	}
 	
 	// Try to send a packet, return true if a packet was sent
-	private boolean send (boolean nagle)
+	private boolean send()
 	{
 		// Return to slow start when the link is idle
 		double now = Event.time();
@@ -95,30 +100,37 @@ class Peer
 		if (payload > msgQueueSize) payload = msgQueueSize;
 		if (payload > window) payload = window;
 		
-		// Nagle's algorithm - try to coalesce small packets
-		if (nagle && payload < Packet.SENSIBLE_PAYLOAD && inflight >0) {
+		// Work out when the first ack or message needs to be sent
+		double deadline = Double.POSITIVE_INFINITY;
+		Deadline<Integer> ack = ackQueue.peek();
+		if (ack != null) deadline = ack.deadline;
+		Deadline<Message> msg = msgQueue.peek();
+		if (msg != null) deadline = Math.min (deadline, msg.deadline);
+		
+		// Delay small packets for coalescing
+		if (payload < Packet.SENSIBLE_PAYLOAD && now < deadline) {
 			log ("delaying transmission of " + payload + " bytes");
 			return false;
 		}
 		
 		// Put all waiting acks in the packet
-		for (Integer seq : ackQueue) p.addAck (seq);
+		for (Deadline<Integer> a : ackQueue) p.addAck (a.item);
 		ackQueue.clear();
 		ackQueueSize = 0;
 		
-		// Don't send sequence number n+MAX_INFLIGHT until sequence
+		// Don't send sequence number n+SEQ_RANGE until sequence
 		// number n has been acked - this limits the number of
 		// sequence numbers the receiver must store for replay
 		// detection. We must still be allowed to send acks,
 		// otherwise the connection could deadlock.
 		
 		if (txSeq > txMaxSeq)
-			log ("waiting for ack " + (txMaxSeq - MAX_INFLIGHT +1));
+			log ("waiting for ack " + (txMaxSeq - SEQ_RANGE + 1));
 		else {
 			// Put as many messages as possible in the packet
-			Iterator<Message> i = msgQueue.iterator();
+			Iterator<Deadline<Message>> i = msgQueue.iterator();
 			while (i.hasNext()) {
-				Message m = i.next();
+				Message m = i.next().item;
 				if (p.size + m.size > Packet.MAX_SIZE) break;
 				i.remove();
 				msgQueueSize -= m.size;
@@ -148,9 +160,10 @@ class Peer
 	
 	private void sendAck (int seq)
 	{
-		ackQueue.add (seq);
+		double now = Event.time();
+		ackQueue.add (new Deadline<Integer> (seq, now + COALESCE_ACK));
 		ackQueueSize += Packet.ACK_SIZE;
-		send (false); // Send a packet immediately, without using Nagle
+		send();
 	}
 	
 	// Called by Node when a packet arrives
@@ -177,7 +190,7 @@ class Peer
 			unpack (p);
 			sendAck (p.seq);
 		}
-		else if (p.seq < rxSeq + MAX_INFLIGHT) {
+		else if (p.seq < rxSeq + SEQ_RANGE) {
 			log ("packet out of order - expected " + rxSeq);
 			if (rxDupe.add (p.seq)) unpack (p);
 			else log ("duplicate packet");
@@ -222,11 +235,11 @@ class Peer
 			}
 		}
 		// Recalculate the maximum sequence number
-		if (txBuffer.isEmpty()) txMaxSeq = txSeq + MAX_INFLIGHT - 1;
-		else txMaxSeq = txBuffer.peek().seq + MAX_INFLIGHT - 1;
+		if (txBuffer.isEmpty()) txMaxSeq = txSeq + SEQ_RANGE - 1;
+		else txMaxSeq = txBuffer.peek().seq + SEQ_RANGE - 1;
 		log ("maximum sequence number " + txMaxSeq);
-		// Send as many packets as possible, using Nagle
-		while (send (true));
+		// Send as many packets as possible
+		while (send());
 	}
 	
 	private void decreaseCongestionWindow (double now)
@@ -258,6 +271,7 @@ class Peer
 	public boolean checkTimeouts()
 	{
 		log ("checking timeouts");
+		send(); // Consider sending delayed packets
 		if (txBuffer.isEmpty()) {
 			log ("no packets in flight");
 			return false;
