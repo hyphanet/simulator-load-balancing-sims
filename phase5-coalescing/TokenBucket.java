@@ -17,11 +17,13 @@ class TokenBucket
 		lastUpdated = now;
 		tokens += elapsed * rate;
 		if (tokens > size) tokens = size;
+		Event.log (tokens + " tokens available");
 		return (int) tokens;
 	}
 	
 	public void remove (int t)
 	{
 		tokens -= t; // Counter can go negative
+		Event.log (t + " tokens removed, " + tokens + " available");
 	}
 }

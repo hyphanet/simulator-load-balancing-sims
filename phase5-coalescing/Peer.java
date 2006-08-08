@@ -18,7 +18,7 @@ class Peer
 	public final static double COALESCE = 0.1; // Max delay in seconds
 	
 	// Out-of-order delivery with eventual detection of missing packets
-	public final static int SEQ_RANGE = 1000; // Packets
+	public final static int SEQ_RANGE = 1000;
 	
 	// Token bucket bandwidth limiter
 	public final static int BUCKET_RATE = 1000; // Bytes per second
@@ -58,13 +58,13 @@ class Peer
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
-		log (m + " added to transmission queue");
+		log (m + " added to message queue");
 		// Warning: until token-passing is implemented the length of
-		// the transmission queue is unlimited
+		// the message queue is unlimited
 		double now = Event.time();
 		msgQueue.add (new Deadline<Message> (m, now + COALESCE));
 		msgQueueSize += m.size;
-		log (msgQueue.size() + " messages in transmission queue");
+		log (msgQueue.size() + " messages in queue");
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible
@@ -84,17 +84,16 @@ class Peer
 		if (now - lastTransmission > RTO * rtt) window.reset();
 		lastTransmission = now;
 		
-		Packet p = new Packet();
-		
 		// Work out how large a packet we can send
-		int payload = Packet.MAX_SIZE - p.size - ackQueueSize;
+		int headersAndAcks = Packet.HEADER_SIZE + ackQueueSize;
+		int payload = Packet.MAX_SIZE - headersAndAcks;
 		if (payload > msgQueueSize) payload = msgQueueSize;
 		
-		int win = window.available() - p.size - ackQueueSize;
+		int win = window.available() - headersAndAcks;
 		if (win <= 0) log ("no room in congestion window for messages");
 		if (payload > win) payload = win;
 		
-		int bw = bandwidth.available() - p.size - ackQueueSize;
+		int bw = bandwidth.available() - headersAndAcks;
 		if (bw <= 0) log ("no bandwidth available for messages");
 		if (payload > bw) payload = bw;
 		
@@ -105,6 +104,7 @@ class Peer
 		}
 		
 		// Put all waiting acks in the packet
+		Packet p = new Packet();
 		for (Deadline<Integer> a : ackQueue) p.addAck (a.item);
 		ackQueue.clear();
 		ackQueueSize = 0;
@@ -137,8 +137,8 @@ class Peer
 		if (p.messages != null) {
 			p.seq = txSeq++;
 			p.sent = now;
-			window.bytesSent (p.size);
 			txBuffer.add (p);
+			window.bytesSent (p.size);
 		}
 		
 		// Send the packet
@@ -150,10 +150,11 @@ class Peer
 	
 	private void sendAck (int seq)
 	{
+		log ("ack " + seq + " added to ack queue");
 		double now = Event.time();
 		ackQueue.add (new Deadline<Integer> (seq, now + COALESCE));
 		ackQueueSize += Packet.ACK_SIZE;
-		log (ackQueue.size() + " acks in ack queue");
+		log (ackQueue.size() + " acks in queue");
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible
