@@ -7,7 +7,7 @@ class Node implements EventTarget
 	public final static double MIN_SLEEP = 0.01; // Seconds
 	
 	// Token bucket bandwidth limiter
-	public final static int BUCKET_RATE = 10000; // Bytes per second
+	public final static int BUCKET_RATE = 1000; // Bytes per second
 	public final static int BUCKET_SIZE = 40000; // Burst size in bytes
 	
 	public double location; // Routing location
