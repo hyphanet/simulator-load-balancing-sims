@@ -5,23 +5,23 @@ import java.util.ArrayList;
 class Packet
 {
 	public final static int HEADER_SIZE = 80; // Including IP & UDP headers
-	public final static int ACK_SIZE = 4; // Size of a sequence num in bytes
+	public final static int ACK_SIZE = 8; // Size of an ack in bytes
 	public final static int MAX_SIZE = 1450; // MTU including headers
-	public final static int SENSIBLE_PAYLOAD = 1000; // Nagle's algorithm
+	public final static int SENSIBLE_PAYLOAD = 1000; // Coalescing
 	
 	public int src, dest; // Network addresses
 	public int size = HEADER_SIZE; // Size in bytes, including headers
 	public int seq = -1; // Data sequence number (-1 if no data)
-	public ArrayList<Integer> acks = null; // Sequence numbers of acked pkts
-	public ArrayList<Message> messages = null; // Payload
+	public ArrayList<Ack> acks = null;
+	public ArrayList<Message> messages = null;
 	
 	public double sent; // Time at which the packet was (re) transmitted
 	public double latency; // Link latency (stored here for convenience)
 	
-	public void addAck (Integer seq)
+	public void addAck (Ack a)
 	{
-		if (acks == null) acks = new ArrayList<Integer>();
-		acks.add (seq);
+		if (acks == null) acks = new ArrayList<Ack>();
+		acks.add (a);
 		size += ACK_SIZE;
 	}
 	

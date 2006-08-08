@@ -61,7 +61,7 @@ class Node implements EventTarget
 	{
 		if (timerRunning) return;
 		log ("starting retransmission/coalescing timer");
-		Event.schedule (this, Peer.COALESCE, CHECK_TIMEOUTS, null);
+		Event.schedule (this, Peer.MAX_DELAY, CHECK_TIMEOUTS, null);
 		timerRunning = true;
 	}
 	
@@ -156,13 +156,13 @@ class Node implements EventTarget
 	// Event callback
 	private void generateRequest()
 	{
-		if (requestsGenerated++ > 1000) return;
+		if (requestsGenerated++ > 10000) return;
 		// Send a request to a random location
 		Request r = new Request (locationToKey (Math.random()));
 		log ("generating request " + r.id);
 		handleRequest (r, null);
 		// Schedule the next request
-		Event.schedule (this, 0.049, GENERATE_REQUEST, null);
+		Event.schedule (this, 0.123, GENERATE_REQUEST, null);
 	}
 	
 	// Event callback
@@ -176,7 +176,7 @@ class Node implements EventTarget
 			timerRunning = false;
 		}
 		else {
-			double sleep = deadline - Event.time();
+			double sleep = deadline - Event.time(); // Can be < 0
 			if (sleep < MIN_SLEEP) sleep = MIN_SLEEP;
 			log ("sleeping for " + sleep + " seconds");
 			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);

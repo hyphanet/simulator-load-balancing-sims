@@ -15,17 +15,17 @@ class Peer
 	public final static double RTT_DECAY = 0.9; // Exp moving average
 	
 	// Coalescing
-	public final static double COALESCE = 0.1; // Max delay in seconds
+	public final static double MAX_DELAY = 0.1; // Coalescing delay, seconds
 	
 	// Out-of-order delivery with eventual detection of missing packets
 	public final static int SEQ_RANGE = 1000;
 	
 	// Token bucket bandwidth limiter
-	public final static int BUCKET_RATE = 1000; // Bytes per second
-	public final static int BUCKET_SIZE = 2000; // Burst size in bytes
+	public final static int BUCKET_RATE = 2000; // Bytes per second
+	public final static int BUCKET_SIZE = 4000; // Burst size in bytes
 	
 	// Sender state
-	private double rtt = 3.0; // Estimated round-trip time in seconds
+	private double rtt = 5.0; // Estimated round-trip time in seconds
 	private int txSeq = 0; // Sequence number of next outgoing data packet
 	private int txMaxSeq = SEQ_RANGE - 1; // Highest sequence number
 	private LinkedList<Packet> txBuffer; // Retransmission buffer
@@ -50,7 +50,7 @@ class Peer
 		txBuffer = new LinkedList<Packet>();
 		msgQueue = new LinkedList<Deadline<Message>>();
 		ackQueue = new LinkedList<Deadline<Integer>>();
-		window = new CongestionWindow();
+		window = new CongestionWindow (this);
 		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 		rxDupe = new HashSet<Integer>();
 	}
@@ -62,7 +62,7 @@ class Peer
 		// Warning: until token-passing is implemented the length of
 		// the message queue is unlimited
 		double now = Event.time();
-		msgQueue.add (new Deadline<Message> (m, now + COALESCE));
+		msgQueue.add (new Deadline<Message> (m, now + MAX_DELAY));
 		msgQueueSize += m.size;
 		log (msgQueue.size() + " messages in queue");
 		// Start the node's timer if necessary
@@ -103,9 +103,13 @@ class Peer
 			return false;
 		}
 		
-		// Put all waiting acks in the packet
 		Packet p = new Packet();
-		for (Deadline<Integer> a : ackQueue) p.addAck (a.item);
+		
+		// Put all waiting acks in the packet
+		for (Deadline<Integer> a : ackQueue) {
+			double delay = now - (a.deadline - MAX_DELAY);
+			p.addAck (new Ack (a.item, delay));
+		}
 		ackQueue.clear();
 		ackQueueSize = 0;
 		
@@ -152,7 +156,7 @@ class Peer
 	{
 		log ("ack " + seq + " added to ack queue");
 		double now = Event.time();
-		ackQueue.add (new Deadline<Integer> (seq, now + COALESCE));
+		ackQueue.add (new Deadline<Integer> (seq, now + MAX_DELAY));
 		ackQueueSize += Packet.ACK_SIZE;
 		log (ackQueue.size() + " acks in queue");
 		// Start the node's timer if necessary
@@ -165,7 +169,7 @@ class Peer
 	public void handlePacket (Packet p)
 	{
 		if (p.messages != null) handleData (p);
-		if (p.acks != null) for (int seq : p.acks) handleAck (seq);
+		if (p.acks != null) for (Ack a : p.acks) handleAck (a);
 	}
 	
 	private void handleData (Packet p)
@@ -195,28 +199,30 @@ class Peer
 		else log ("warning: received " + p.seq + " before " + rxSeq);
 	}
 	
-	private void handleAck (int seq)
+	private void handleAck (Ack a)
 	{
-		log ("received ack " + seq);
+		log ("received ack " + a.seq);
 		double now = Event.time();
 		Iterator<Packet> i = txBuffer.iterator();
 		while (i.hasNext()) {
 			Packet p = i.next();
 			double age = now - p.sent;
 			// Explicit ack
-			if (p.seq == seq) {
+			if (p.seq == a.seq) {
 				log ("packet " + p.seq + " acknowledged");
 				i.remove();
 				// Update the congestion window
 				window.bytesAcked (p.size);
 				// Update the average round-trip time
-				rtt = rtt * RTT_DECAY + age * (1.0 - RTT_DECAY);
-				log ("round-trip time " + age);
+				rtt *= RTT_DECAY;
+				rtt += (age - a.delay) * (1.0 - RTT_DECAY);
+				log ("ack delay " + a.delay);
+				log ("round-trip time " + (age - a.delay));
 				log ("average round-trip time " + rtt);
 				break;
 			}
 			// Fast retransmission
-			if (p.seq < seq && age > FRTO * rtt) {
+			if (p.seq < a.seq && age > FRTO * rtt) {
 				p.sent = now;
 				log ("fast retransmitting packet " + p.seq);
 				node.net.send (p, address, latency);
@@ -258,7 +264,7 @@ class Peer
 				window.timeout (now);
 			}
 		}
-		return Math.min (now + COALESCE, deadline());
+		return Math.min (now + MAX_DELAY, deadline());
 	}
 	
 	// Work out when the first ack or message needs to be sent
@@ -272,7 +278,7 @@ class Peer
 		return deadline;
 	}
 	
-	private void log (String message)
+	public void log (String message)
 	{
 		Event.log (node.net.address + ":" + address + " " + message);
 	}
