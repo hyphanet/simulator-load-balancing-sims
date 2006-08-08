@@ -20,10 +20,6 @@ class Peer
 	// Out-of-order delivery with eventual detection of missing packets
 	public final static int SEQ_RANGE = 1000;
 	
-	// Token bucket bandwidth limiter
-	public final static int BUCKET_RATE = 2000; // Bytes per second
-	public final static int BUCKET_SIZE = 4000; // Burst size in bytes
-	
 	// Sender state
 	private double rtt = 5.0; // Estimated round-trip time in seconds
 	private int txSeq = 0; // Sequence number of next outgoing data packet
@@ -35,7 +31,6 @@ class Peer
 	private int ackQueueSize = 0; // Size of ack queue in bytes
 	private CongestionWindow window; // AIMD congestion window
 	private double lastTransmission = 0.0; // Clock time
-	private TokenBucket bandwidth; // Token bucket bandwidth limiter
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -51,7 +46,6 @@ class Peer
 		msgQueue = new LinkedList<Deadline<Message>>();
 		ackQueue = new LinkedList<Deadline<Integer>>();
 		window = new CongestionWindow (this);
-		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 		rxDupe = new HashSet<Integer>();
 	}
 	
@@ -93,7 +87,7 @@ class Peer
 		if (win <= 0) log ("no room in congestion window for messages");
 		if (payload > win) payload = win;
 		
-		int bw = bandwidth.available() - headersAndAcks;
+		int bw = node.bandwidth.available() - headersAndAcks;
 		if (bw <= 0) log ("no bandwidth available for messages");
 		if (payload > bw) payload = bw;
 		
@@ -148,7 +142,7 @@ class Peer
 		// Send the packet
 		log ("sending packet " + p.seq + ", " + p.size + " bytes");
 		node.net.send (p, address, latency);
-		bandwidth.remove (p.size);
+		node.bandwidth.remove (p.size);
 		return true;
 	}
 	

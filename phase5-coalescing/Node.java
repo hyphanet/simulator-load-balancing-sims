@@ -6,6 +6,10 @@ class Node implements EventTarget
 	public final static int STORE_SIZE = 10; // Max number of keys in store
 	public final static double MIN_SLEEP = 0.01; // Seconds
 	
+	// Token bucket bandwidth limiter
+	public final static int BUCKET_RATE = 10000; // Bytes per second
+	public final static int BUCKET_SIZE = 40000; // Burst size in bytes
+	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
@@ -13,6 +17,7 @@ class Node implements EventTarget
 	private HashSet<Integer> recentlySeenRequests; // Request IDs
 	private HashMap<Integer,RequestState> outstandingRequests;
 	public LruCache<Integer> cache; // Datastore containing keys
+	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false; // Is the timer running?
 	
 	public Node (double txSpeed, double rxSpeed)
@@ -23,6 +28,7 @@ class Node implements EventTarget
 		recentlySeenRequests = new HashSet<Integer>();
 		outstandingRequests = new HashMap<Integer,RequestState>();
 		cache = new LruCache<Integer> (STORE_SIZE);
+		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 	}
 	
 	public void connect (Node n, double latency)
@@ -98,8 +104,7 @@ class Node implements EventTarget
 		}
 		if (cache.get (r.key)) {
 			log ("key " + r.key + " found in cache");
-			if (prev == null)
-				log (r + " succeeded locally");
+			if (prev == null) log (r + " succeeded locally");
 			else prev.sendMessage (new Response (r.id, r.key));
 			return;
 		}
@@ -137,8 +142,7 @@ class Node implements EventTarget
 		Peer next = rs.closestPeer();
 		if (next == null) {
 			log ("route not found for " + rs);
-			if (rs.prev == null)
-				log (rs + " failed");
+			if (rs.prev == null) log (rs + " failed");
 			else rs.prev.sendMessage (new RouteNotFound (rs.id));
 			return;
 		}
