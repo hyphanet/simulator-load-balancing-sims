@@ -37,7 +37,7 @@ class Node implements EventTarget
 		n.connect (this, latency);
 	}
 	
-	// Returns the circular distance between two locations
+	// Calculate the circular distance between two locations
 	public static double distance (double a, double b)
 	{
 		if (a > b) return Math.min (a - b, b - a + 1.0);

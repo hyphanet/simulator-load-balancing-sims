@@ -19,7 +19,7 @@ class RequestState
 		if (prev != null) nexts.remove (prev);
 	}
 	
-	// Returns the closest peer to the requested key
+	// Find the closest peer to the requested key
 	public Peer closestPeer()
 	{
 		double keyLoc = Node.keyToLocation (key);

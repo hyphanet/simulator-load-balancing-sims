@@ -14,26 +14,18 @@ class Peer
 	public final static double FRTO = 1.5; // Fast retx timeout in RTTs
 	public final static double RTT_DECAY = 0.9; // Exp moving average
 	
-	// Congestion control parameters
-	public final static int MIN_CWIND = 3000; // Minimum congestion window
-	public final static int MAX_CWIND = 100000; // Maximum congestion window
-	public final static double ALPHA = 0.1615; // AIMD increase parameter
-	public final static double BETA = 0.9375; // AIMD decrease parameter
-	public final static double GAMMA = 3.0; // Slow start divisor
-	
 	// Coalescing
 	public final static double COALESCE = 0.1; // Max delay in seconds
 	
 	// Out-of-order delivery with eventual detection of missing packets
 	public final static int SEQ_RANGE = 1000; // Packets
 	
+	// Token bucket bandwidth limiter
+	public final static int BUCKET_RATE = 1000; // Bytes per second
+	public final static int BUCKET_SIZE = 2000; // Burst size in bytes
+	
 	// Sender state
-	private double cwind = MIN_CWIND; // Congestion window in bytes
-	private boolean slowStart = true; // Are we in the slow start phase?
 	private double rtt = 3.0; // Estimated round-trip time in seconds
-	private double lastTransmission = 0.0; // Clock time
-	private double lastLeftSlowStart = 0.0; // Clock time
-	private int inflight = 0; // Bytes sent but not acked
 	private int txSeq = 0; // Sequence number of next outgoing data packet
 	private int txMaxSeq = SEQ_RANGE - 1; // Highest sequence number
 	private LinkedList<Packet> txBuffer; // Retransmission buffer
@@ -41,6 +33,9 @@ class Peer
 	private int msgQueueSize = 0; // Size of message queue in bytes
 	private LinkedList<Deadline<Integer>> ackQueue; // Outgoing acks
 	private int ackQueueSize = 0; // Size of ack queue in bytes
+	private CongestionWindow window; // AIMD congestion window
+	private double lastTransmission = 0.0; // Clock time
+	private TokenBucket bandwidth; // Token bucket bandwidth limiter
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -55,6 +50,8 @@ class Peer
 		txBuffer = new LinkedList<Packet>();
 		msgQueue = new LinkedList<Deadline<Message>>();
 		ackQueue = new LinkedList<Deadline<Integer>>();
+		window = new CongestionWindow();
+		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 		rxDupe = new HashSet<Integer>();
 	}
 	
@@ -76,30 +73,30 @@ class Peer
 	
 	// Try to send a packet, return true if a packet was sent
 	private boolean send()
-	{
-		// Return to slow start when the link is idle
-		double now = Event.time();
-		if (now - lastTransmission > RTO * rtt) {
-			log ("returning to slow start");
-			cwind = MIN_CWIND;
-			slowStart = true;
-		}
-		lastTransmission = now;
-		
+	{		
 		if (ackQueueSize == 0 && msgQueueSize == 0) {
 			log ("no messages or acks to send");
 			return false;
 		}
 		
-		Packet p = new Packet();
+		// Return to slow start when the link is idle
+		double now = Event.time();
+		if (now - lastTransmission > RTO * rtt) window.reset();
+		lastTransmission = now;
 		
-		int window = (int) cwind - inflight - p.size - ackQueueSize;
-		if (window <= 0) log ("no room in congestion window");
+		Packet p = new Packet();
 		
 		// Work out how large a packet we can send
 		int payload = Packet.MAX_SIZE - p.size - ackQueueSize;
 		if (payload > msgQueueSize) payload = msgQueueSize;
-		if (payload > window) payload = window;
+		
+		int win = window.available() - p.size - ackQueueSize;
+		if (win <= 0) log ("no room in congestion window for messages");
+		if (payload > win) payload = win;
+		
+		int bw = bandwidth.available() - p.size - ackQueueSize;
+		if (bw <= 0) log ("no bandwidth available for messages");
+		if (payload > bw) payload = bw;
 		
 		// Delay small packets for coalescing
 		if (payload < Packet.SENSIBLE_PAYLOAD && now < deadline()) {
@@ -125,10 +122,11 @@ class Peer
 			Iterator<Deadline<Message>> i = msgQueue.iterator();
 			while (i.hasNext()) {
 				Message m = i.next().item;
-				if (p.size + m.size > Packet.MAX_SIZE) break;
+				if (payload - m.size < 0) break;
 				i.remove();
 				msgQueueSize -= m.size;
 				p.addMessage (m);
+				payload -= m.size;
 			}
 		}
 		
@@ -139,14 +137,14 @@ class Peer
 		if (p.messages != null) {
 			p.seq = txSeq++;
 			p.sent = now;
-			inflight += p.size; // Acks aren't congestion-controlled
-			log (inflight + " bytes in flight");
+			window.bytesSent (p.size);
 			txBuffer.add (p);
 		}
 		
 		// Send the packet
 		log ("sending packet " + p.seq + ", " + p.size + " bytes");
 		node.net.send (p, address, latency);
+		bandwidth.remove (p.size);
 		return true;
 	}
 	
@@ -155,6 +153,7 @@ class Peer
 		double now = Event.time();
 		ackQueue.add (new Deadline<Integer> (seq, now + COALESCE));
 		ackQueueSize += Packet.ACK_SIZE;
+		log (ackQueue.size() + " acks in ack queue");
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible
@@ -207,13 +206,8 @@ class Peer
 			if (p.seq == seq) {
 				log ("packet " + p.seq + " acknowledged");
 				i.remove();
-				inflight -= p.size;
-				log (inflight + " bytes in flight");
-				// Increase the congestion window
-				if (slowStart) cwind += p.size / GAMMA;
-				else cwind += p.size * p.size * ALPHA / cwind;
-				if (cwind > MAX_CWIND) cwind = MAX_CWIND;
-				log ("congestion window increased to " + cwind);
+				// Update the congestion window
+				window.bytesAcked (p.size);
 				// Update the average round-trip time
 				rtt = rtt * RTT_DECAY + age * (1.0 - RTT_DECAY);
 				log ("round-trip time " + age);
@@ -224,9 +218,8 @@ class Peer
 			if (p.seq < seq && age > FRTO * rtt) {
 				p.sent = now;
 				log ("fast retransmitting packet " + p.seq);
-				log (inflight + " bytes in flight");
 				node.net.send (p, address, latency);
-				decreaseCongestionWindow (now);
+				window.fastRetransmission (now);
 			}
 		}
 		// Recalculate the maximum sequence number
@@ -237,40 +230,11 @@ class Peer
 		while (send());
 	}
 	
-	private void decreaseCongestionWindow (double now)
-	{
-		cwind *= BETA;
-		if (cwind < MIN_CWIND) cwind = MIN_CWIND;
-		log ("congestion window decreased to " + cwind);
-		// The slow start phase ends when the first packet is lost
-		if (slowStart) {
-			log ("leaving slow start");
-			slowStart = false;
-			lastLeftSlowStart = now;
-		}
-	}
-	
 	// Remove messages from a packet and deliver them to the node
 	private void unpack (Packet p)
 	{
 		if (p.messages == null) return;
 		for (Message m : p.messages) node.handleMessage (m, this);
-	}
-	
-	// Work out when the first ack or message needs to be sent
-	private double deadline()
-	{
-		double deadline = Double.POSITIVE_INFINITY;
-		Deadline<Integer> ack = ackQueue.peek();
-		if (ack != null) deadline = ack.deadline;
-		Deadline<Message> msg = msgQueue.peek();
-		if (msg != null) deadline = Math.min (deadline, msg.deadline);
-		return deadline;
-	}
-	
-	private void log (String message)
-	{
-		Event.log (node.net.address + ":" + address + " " + message);
 	}
 	
 	// Called by Node, returns the next coalescing or retx deadline
@@ -287,23 +251,28 @@ class Peer
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt) {
 				// Retransmission timeout
-				p.sent = now;
 				log ("retransmitting packet " + p.seq);
-				log (inflight + " bytes in flight");
+				p.sent = now;
 				node.net.send (p, address, latency);
-				// Return to slow start
-				if (!slowStart &&
-				now - lastLeftSlowStart > RTO * rtt) {
-					log ("returning to slow start");
-					cwind = MIN_CWIND;
-					slowStart = true;
-				}
-				else {
-					log ("not returning to slow start");
-					decreaseCongestionWindow (now);
-				}
+				window.timeout (now);
 			}
 		}
 		return Math.min (now + COALESCE, deadline());
+	}
+	
+	// Work out when the first ack or message needs to be sent
+	private double deadline()
+	{
+		double deadline = Double.POSITIVE_INFINITY;
+		Deadline<Integer> ack = ackQueue.peek();
+		if (ack != null) deadline = ack.deadline;
+		Deadline<Message> msg = msgQueue.peek();
+		if (msg != null) deadline = Math.min (deadline, msg.deadline);
+		return deadline;
+	}
+	
+	private void log (String message)
+	{
+		Event.log (node.net.address + ":" + address + " " + message);
 	}
 }
