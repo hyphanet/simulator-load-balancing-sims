@@ -122,7 +122,7 @@ class Peer
 			Iterator<Deadline<Message>> i = msgQueue.iterator();
 			while (i.hasNext()) {
 				Message m = i.next().item;
-				if (payload - m.size < 0) break;
+				if (m.size > payload) break;
 				i.remove();
 				msgQueueSize -= m.size;
 				p.addMessage (m);
