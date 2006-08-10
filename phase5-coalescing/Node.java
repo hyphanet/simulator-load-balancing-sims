@@ -1,5 +1,7 @@
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Collections;
 
 class Node implements EventTarget
 {
@@ -166,14 +168,18 @@ class Node implements EventTarget
 		log ("generating request " + r.id);
 		handleRequest (r, null);
 		// Schedule the next request
-		Event.schedule (this, 1.23, GENERATE_REQUEST, null);
+		Event.schedule (this, 0.0123, GENERATE_REQUEST, null);
 	}
 	
 	// Event callback
 	private void checkTimeouts()
 	{
+		// Check the peers in a random order each time
+		ArrayList<Peer> shuffled = new ArrayList<Peer> (peers.values());
+		Collections.shuffle (shuffled);
+		
 		double deadline = Double.POSITIVE_INFINITY;
-		for (Peer p : peers.values())
+		for (Peer p : shuffled)
 			deadline = Math.min (deadline, p.checkTimeouts());
 		if (deadline == Double.POSITIVE_INFINITY) {
 			log ("stopping retransmission/coalescing timer");
