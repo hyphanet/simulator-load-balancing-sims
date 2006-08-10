@@ -162,13 +162,12 @@ class Node implements EventTarget
 	// Event callback
 	private void generateRequest()
 	{
-		if (requestsGenerated++ > 10000) return;
-		// Send a request to a random location
-		Request r = new Request (locationToKey (Math.random()));
-		log ("generating request " + r.id);
-		handleRequest (r, null);
-		// Schedule the next request
-		Event.schedule (this, 0.0123, GENERATE_REQUEST, null);
+		for (int i = 0; i < 10000; i++) {
+			// Send a request to a random location
+			Request r = new Request (locationToKey (Math.random()));
+			log ("generating request " + r.id);
+			handleRequest (r, null);
+		}
 	}
 	
 	// Event callback

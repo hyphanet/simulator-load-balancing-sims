@@ -75,7 +75,8 @@ class Peer
 		
 		// Return to slow start when the link is idle
 		double now = Event.time();
-		if (now - lastTransmission > RTO * rtt) window.reset();
+		if (now - lastTransmission > RTO * rtt + MAX_DELAY)
+			window.reset();
 		lastTransmission = now;
 		
 		// Work out how large a packet we can send
@@ -100,10 +101,7 @@ class Peer
 		Packet p = new Packet();
 		
 		// Put all waiting acks in the packet
-		for (Deadline<Integer> a : ackQueue) {
-			double delay = now - (a.deadline - MAX_DELAY);
-			p.addAck (new Ack (a.item, delay));
-		}
+		for (Deadline<Integer> a : ackQueue) p.addAck (a.item);
 		ackQueue.clear();
 		ackQueueSize = 0;
 		
@@ -163,7 +161,7 @@ class Peer
 	public void handlePacket (Packet p)
 	{
 		if (p.messages != null) handleData (p);
-		if (p.acks != null) for (Ack a : p.acks) handleAck (a);
+		if (p.acks != null) for (int ack : p.acks) handleAck (ack);
 	}
 	
 	private void handleData (Packet p)
@@ -193,30 +191,28 @@ class Peer
 		else log ("warning: received " + p.seq + " before " + rxSeq);
 	}
 	
-	private void handleAck (Ack a)
+	private void handleAck (int ack)
 	{
-		log ("received ack " + a.seq);
+		log ("received ack " + ack);
 		double now = Event.time();
 		Iterator<Packet> i = txBuffer.iterator();
 		while (i.hasNext()) {
 			Packet p = i.next();
 			double age = now - p.sent;
 			// Explicit ack
-			if (p.seq == a.seq) {
+			if (p.seq == ack) {
 				log ("packet " + p.seq + " acknowledged");
 				i.remove();
 				// Update the congestion window
 				window.bytesAcked (p.size);
 				// Update the average round-trip time
-				rtt *= RTT_DECAY;
-				rtt += (age - a.delay) * (1.0 - RTT_DECAY);
-				log ("ack delay " + a.delay);
-				log ("round-trip time " + (age - a.delay));
+				rtt = rtt * RTT_DECAY + age * (1.0 - RTT_DECAY);
+				log ("round-trip time " + age);
 				log ("average round-trip time " + rtt);
 				break;
 			}
 			// Fast retransmission
-			if (p.seq < a.seq && age > FRTO * rtt) {
+			if (p.seq < ack && age > FRTO * rtt + MAX_DELAY) {
 				p.sent = now;
 				log ("fast retransmitting packet " + p.seq);
 				node.net.send (p, address, latency);
