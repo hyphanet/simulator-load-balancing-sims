@@ -58,7 +58,6 @@ class Peer
 		double now = Event.time();
 		msgQueue.add (new Deadline<Message> (m, now + MAX_DELAY));
 		msgQueueSize += m.size;
-		log (msgQueue.size() + " messages in queue");
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible
@@ -72,6 +71,8 @@ class Peer
 			log ("no messages or acks to send");
 			return false;
 		}
+		log (ackQueue.size() + " acks in queue");
+		log (msgQueue.size() + " messages in queue");
 		
 		// Return to slow start when the link is idle
 		double now = Event.time();
@@ -83,17 +84,13 @@ class Peer
 		int headersAndAcks = Packet.HEADER_SIZE + ackQueueSize;
 		int payload = Packet.MAX_SIZE - headersAndAcks;
 		if (payload > msgQueueSize) payload = msgQueueSize;
-		
 		int win = window.available() - headersAndAcks;
-		if (win <= 0) log ("no room in congestion window for messages");
 		if (payload > win) payload = win;
-		
 		int bw = node.bandwidth.available() - headersAndAcks;
-		if (bw <= 0) log ("no bandwidth available for messages");
 		if (payload > bw) payload = bw;
 		
 		// Delay small packets for coalescing
-		if (payload < Packet.SENSIBLE_PAYLOAD && now < deadline()) {
+		if (now < deadline (now)) {
 			log ("delaying transmission of " + payload + " bytes");
 			return false;
 		}
@@ -150,7 +147,6 @@ class Peer
 		double now = Event.time();
 		ackQueue.add (new Deadline<Integer> (seq, now + MAX_DELAY));
 		ackQueueSize += Packet.ACK_SIZE;
-		log (ackQueue.size() + " acks in queue");
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible
@@ -240,13 +236,14 @@ class Peer
 		log ("checking timeouts");
 		// Send as many packets as possible
 		while (send());
+		
+		double now = Event.time();
 		if (txBuffer.isEmpty()) {
 			log ("no packets in flight");
-			return deadline();
+			return deadline (now);
 		}
-		double now = Event.time();
 		for (Packet p : txBuffer) {
-			if (now - p.sent > RTO * rtt) {
+			if (now - p.sent > RTO * rtt + MAX_DELAY) {
 				// Retransmission timeout
 				log ("retransmitting packet " + p.seq);
 				p.sent = now;
@@ -254,18 +251,26 @@ class Peer
 				window.timeout (now);
 			}
 		}
-		return Math.min (now + MAX_DELAY, deadline());
+		return Math.min (now + MAX_DELAY, deadline (now));
 	}
 	
-	// Work out when the first ack or message needs to be sent
-	private double deadline()
+	// Work out when the first message or ack needs to be sent
+	private double deadline (double now)
 	{
-		double deadline = Double.POSITIVE_INFINITY;
-		Deadline<Integer> ack = ackQueue.peek();
-		if (ack != null) deadline = ack.deadline;
-		Deadline<Message> msg = msgQueue.peek();
-		if (msg != null) deadline = Math.min (deadline, msg.deadline);
-		return deadline;
+		double ackDeadline = Double.POSITIVE_INFINITY;
+		Deadline<Integer> firstAck = ackQueue.peek();
+		if (firstAck != null) ackDeadline = firstAck.deadline;
+		
+		double msgDeadline = Double.POSITIVE_INFINITY;
+		Deadline<Message> firstMsg = msgQueue.peek();
+		if (firstMsg != null) msgDeadline = firstMsg.deadline;
+		
+		if (ackDeadline <= msgDeadline) return ackDeadline;
+		if (msgDeadline == Double.POSITIVE_INFINITY) return msgDeadline;
+		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return msgDeadline;
+		if (window.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return Double.POSITIVE_INFINITY; // Wait for an ack
+		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return now + Node.SHORT_SLEEP; // Poll the bandwidth limiter
+		return now;
 	}
 	
 	public void log (String message)

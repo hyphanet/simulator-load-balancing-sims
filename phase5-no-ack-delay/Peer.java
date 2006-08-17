@@ -78,18 +78,13 @@ class Peer
 		// Work out how large a packet we can send
 		int payload = Packet.MAX_SIZE - Packet.HEADER_SIZE;
 		if (payload > msgQueueSize) payload = msgQueueSize;
-		
 		int win = window.available() - Packet.HEADER_SIZE;
-		if (win <= 0) log ("no room in congestion window for messages");
 		if (payload > win) payload = win;
-		
 		int bw = node.bandwidth.available() - Packet.HEADER_SIZE;
-		if (bw <= 0) log ("no bandwidth available for messages");
 		if (payload > bw) payload = bw;
 		
 		// Delay small packets for coalescing
-		if (payload < Packet.SENSIBLE_PAYLOAD &&
-		now < deadline() && ack == Packet.NO_ACK) {
+		if (now < deadline (now) && ack == Packet.NO_ACK) {
 			log ("delaying transmission of " + payload + " bytes");
 			return false;
 		}
@@ -226,11 +221,12 @@ class Peer
 		log ("checking timeouts");
 		// Send as many packets as possible
 		while (send (Packet.NO_ACK));
+		
+		double now = Event.time();
 		if (txBuffer.isEmpty()) {
 			log ("no packets in flight");
-			return deadline();
+			return deadline (now);
 		}
-		double now = Event.time();
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt) {
 				// Retransmission timeout
@@ -240,16 +236,21 @@ class Peer
 				window.timeout (now);
 			}
 		}
-		return Math.min (now + MAX_DELAY, deadline());
+		return Math.min (now + MAX_DELAY, deadline (now));
 	}
 	
-	// Work out when the first ack or message needs to be sent
-	private double deadline()
+	// Work out when the first message needs to be sent
+	private double deadline (double now)
 	{
-		double deadline = Double.POSITIVE_INFINITY;
-		Deadline<Message> msg = msgQueue.peek();
-		if (msg != null) deadline = msg.deadline;
-		return deadline;
+		double msgDeadline = Double.POSITIVE_INFINITY;
+		Deadline<Message> firstMsg = msgQueue.peek();
+		if (firstMsg == null) return Double.POSITIVE_INFINITY;
+		else msgDeadline = firstMsg.deadline;
+		
+		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return msgDeadline;
+		if (window.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return Double.POSITIVE_INFINITY; // Wait for an ack
+		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return now + Node.SHORT_SLEEP; // Poll the bandwidth limiter
+		return now;
 	}
 	
 	public void log (String message)

@@ -7,9 +7,10 @@ class Node implements EventTarget
 {
 	public final static int STORE_SIZE = 10; // Max number of keys in store
 	public final static double MIN_SLEEP = 0.01; // Seconds
+	public final static double SHORT_SLEEP = 0.05; // Poll the bw limiter
 	
 	// Token bucket bandwidth limiter
-	public final static int BUCKET_RATE = 10000; // Bytes per second
+	public final static int BUCKET_RATE = 20000; // Bytes per second
 	public final static int BUCKET_SIZE = 40000; // Burst size in bytes
 	
 	public double location; // Routing location
