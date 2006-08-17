@@ -90,8 +90,9 @@ class Peer
 		if (payload > bw) payload = bw;
 		
 		// Delay small packets for coalescing
-		if (now < deadline (now)) {
-			log ("delaying transmission of " + payload + " bytes");
+		double delay = deadline (now) - now;
+		if (delay > 0.0) {
+			log ("delaying transmission of " + payload + " bytes for " + delay + " seconds");
 			return false;
 		}
 		
@@ -264,12 +265,12 @@ class Peer
 		double msgDeadline = Double.POSITIVE_INFINITY;
 		Deadline<Message> firstMsg = msgQueue.peek();
 		if (firstMsg != null) msgDeadline = firstMsg.deadline;
+		if (window.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) msgDeadline = Double.POSITIVE_INFINITY; // Wait for an ack
+		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) msgDeadline = Math.max (msgDeadline, now + Node.SHORT_SLEEP); // Poll the bandwidth limiter
 		
 		if (ackDeadline <= msgDeadline) return ackDeadline;
 		if (msgDeadline == Double.POSITIVE_INFINITY) return msgDeadline;
 		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return msgDeadline;
-		if (window.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return Double.POSITIVE_INFINITY; // Wait for an ack
-		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return now + Node.SHORT_SLEEP; // Poll the bandwidth limiter
 		return now;
 	}
 	

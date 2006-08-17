@@ -190,7 +190,6 @@ class Node implements EventTarget
 			if (sleep < MIN_SLEEP) sleep = MIN_SLEEP;
 			log ("sleeping for " + sleep + " seconds");
 			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);
-			timerRunning = true;
 		}
 	}
 	

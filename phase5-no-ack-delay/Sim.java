@@ -6,7 +6,7 @@ class Sim
 {
 	public static void main (String[] args)
 	{		
-		double txSpeed = 150000, rxSpeed = 150000; // Bytes per second
+		double txSpeed = 15000, rxSpeed = 15000; // Bytes per second
 		// rxSpeed = Math.exp (rand.nextGaussian() + 11.74);
 		// txSpeed = rxSpeed / 5.0;
 		

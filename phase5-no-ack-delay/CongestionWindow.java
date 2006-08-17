@@ -28,6 +28,7 @@ class CongestionWindow
 	
 	public int available()
 	{
+		peer.log ((int)(cwind - inflight) + " bytes in window");
 		return (int) cwind - inflight;
 	}
 	
