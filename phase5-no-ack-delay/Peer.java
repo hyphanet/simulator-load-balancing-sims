@@ -242,14 +242,16 @@ class Peer
 	// Work out when the first message needs to be sent
 	private double deadline (double now)
 	{
-		double msgDeadline = Double.POSITIVE_INFINITY;
 		Deadline<Message> firstMsg = msgQueue.peek();
 		if (firstMsg == null) return Double.POSITIVE_INFINITY;
-		else msgDeadline = firstMsg.deadline;
-		
-		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return msgDeadline;
-		if (window.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return Double.POSITIVE_INFINITY; // Wait for an ack
-		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) return now + Node.SHORT_SLEEP; // Poll the bandwidth limiter
+		double deadline = firstMsg.deadline;
+		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return deadline;
+		if (window.available() < Packet.SENSIBLE_PAYLOAD
+		+ Packet.HEADER_SIZE)
+			return Double.POSITIVE_INFINITY; // Wait for an ack
+		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD
+		+ Packet.HEADER_SIZE)
+			return Math.max (deadline, now + Node.SHORT_SLEEP);
 		return now;
 	}
 	

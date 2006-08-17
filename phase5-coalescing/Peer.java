@@ -90,9 +90,8 @@ class Peer
 		if (payload > bw) payload = bw;
 		
 		// Delay small packets for coalescing
-		double delay = deadline (now) - now;
-		if (delay > 0.0) {
-			log ("delaying transmission of " + payload + " bytes for " + delay + " seconds");
+		if (now < deadline (now)) {
+			log ("delaying transmission of " + payload + " bytes");
 			return false;
 		}
 		
@@ -258,19 +257,30 @@ class Peer
 	// Work out when the first message or ack needs to be sent
 	private double deadline (double now)
 	{
-		double ackDeadline = Double.POSITIVE_INFINITY;
+		return Math.min (ackDeadline(), msgDeadline (now));
+	}
+
+	// Work out when the first ack needs to be sent
+	private double ackDeadline()
+	{
 		Deadline<Integer> firstAck = ackQueue.peek();
-		if (firstAck != null) ackDeadline = firstAck.deadline;
-		
-		double msgDeadline = Double.POSITIVE_INFINITY;
+		if (firstAck == null) return Double.POSITIVE_INFINITY;
+		return firstAck.deadline;
+	}
+	
+	// Work out when the first message needs to be sent
+	private double msgDeadline (double now)
+	{
 		Deadline<Message> firstMsg = msgQueue.peek();
-		if (firstMsg != null) msgDeadline = firstMsg.deadline;
-		if (window.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) msgDeadline = Double.POSITIVE_INFINITY; // Wait for an ack
-		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD + Packet.HEADER_SIZE) msgDeadline = Math.max (msgDeadline, now + Node.SHORT_SLEEP); // Poll the bandwidth limiter
-		
-		if (ackDeadline <= msgDeadline) return ackDeadline;
-		if (msgDeadline == Double.POSITIVE_INFINITY) return msgDeadline;
-		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return msgDeadline;
+		if (firstMsg == null) return Double.POSITIVE_INFINITY;
+		double deadline = firstMsg.deadline;
+		if (msgQueueSize < Packet.SENSIBLE_PAYLOAD) return deadline;
+		if (window.available() < Packet.SENSIBLE_PAYLOAD
+		+ Packet.HEADER_SIZE)
+			return Double.POSITIVE_INFINITY; // Wait for an ack
+		if (node.bandwidth.available() < Packet.SENSIBLE_PAYLOAD
+		+ Packet.HEADER_SIZE)
+			return Math.max (deadline, now + Node.SHORT_SLEEP);
 		return now;
 	}
 	
