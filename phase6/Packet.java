@@ -5,7 +5,7 @@ import messages.Message;
 
 class Packet
 {
-	public final static int HEADER_SIZE = 80; // Including IP & UDP headers
+	public final static int HEADER_SIZE = 70; // Including IP & UDP headers
 	public final static int ACK_SIZE = 4; // Size of an ack in bytes
 	public final static int MAX_SIZE = 1450; // MTU including headers
 	public final static int SENSIBLE_PAYLOAD = 1000; // Coalescing

@@ -112,7 +112,7 @@ class Node implements EventTarget
 			log ("key " + r.key + " found in cache");
 			if (prev == null) log (r + " succeeded locally");
 			else for (int i = 0; i < 32; i++)
-				prev.sendBlock (new Response (r.id, i));
+				prev.sendMessage (new Response (r.id, i));
 			return;
 		}
 		log ("key " + r.key + " not found in cache");
@@ -131,7 +131,7 @@ class Node implements EventTarget
 		// Forward the block
 		if (rs.prev != null) {
 			log ("forwarding " + r);
-			rs.prev.sendBlock (r);
+			rs.prev.sendMessage (r);
 		}
 	}
 	
