@@ -1,7 +1,6 @@
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.HashSet;
-import messages.Ack;
 import messages.Message;
 import messages.Block;
 
@@ -29,9 +28,9 @@ class Peer
 	private int txSeq = 0; // Sequence number of next outgoing data packet
 	private int txMaxSeq = SEQ_RANGE - 1; // Highest sequence number
 	private LinkedList<Packet> txBuffer; // Retransmission buffer
-	private DeadlineQueue<Ack> ackQueue; // Outgoing acks
-	private DeadlineQueue<Message> searchQueue; // Outgoing search messages
-	private DeadlineQueue<Block> transferQueue; // Outgoing transfers
+	private AckQueue ackQueue; // Outgoing acks
+	private DeadlineQueue searchQueue; // Outgoing search messages
+	private DeadlineQueue transferQueue; // Outgoing transfers
 	private boolean tgif = false; // "Transfers go in first" toggle
 	private CongestionWindow window; // AIMD congestion window
 	private double lastTransmission = 0.0; // Clock time
@@ -47,9 +46,9 @@ class Peer
 		this.location = location;
 		this.latency = latency;
 		txBuffer = new LinkedList<Packet>();
-		ackQueue = new DeadlineQueue<Ack>();
-		searchQueue = new DeadlineQueue<Message>();
-		transferQueue = new DeadlineQueue<Block>();
+		ackQueue = new AckQueue();
+		searchQueue = new DeadlineQueue();
+		transferQueue = new DeadlineQueue();
 		window = new CongestionWindow (this);
 		rxDupe = new HashSet<Integer>();
 	}
@@ -80,7 +79,7 @@ class Peer
 	private void sendAck (int seq)
 	{
 		log ("ack " + seq + " added to ack queue");
-		ackQueue.add (new Ack (seq), Event.time() + MAX_DELAY);
+		ackQueue.add (seq, Event.time() + MAX_DELAY);
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible
@@ -155,7 +154,7 @@ class Peer
 	public void handlePacket (Packet p)
 	{
 		if (p.messages != null) handleData (p);
-		if (p.acks != null) for (Ack a : p.acks) handleAck (a.seq);
+		if (p.acks != null) for (int ack : p.acks) handleAck (ack);
 	}
 	
 	private void handleData (Packet p)

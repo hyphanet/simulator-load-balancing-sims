@@ -4,9 +4,10 @@ package messages;
 
 public class Message
 {
-	public final static int HEADER_SIZE = 4; // Message type etc
-	public final static int ID_SIZE = 8; // Size of unique request ID
-	public final static int KEY_SIZE = 32; // Size of routing key
+	public final static int HEADER_SIZE = 12; // Bytes, including unique ID
+	public final static int KEY_SIZE = 32; // Size of routing key, bytes
+	public final static int DATA_SIZE = 1024; // Size of data block, bytes
 	
 	public int size; // Size in bytes
+	public int id; // Unique request ID
 }

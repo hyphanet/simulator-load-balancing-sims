@@ -1,20 +1,16 @@
+// A single block of a multi-block response
+
 package messages;
 
-public class Response extends Message
+public class Response extends Block
 {
-	public final int id; // The unique ID of the request
-	public final int key; // The requested key
-	
-	public Response (int id, int key)
+	public Response (int id, int index)
 	{
-		this.id = id;
-		this.key = key;
-		size = Message.HEADER_SIZE + Message.ID_SIZE +
-			Message.KEY_SIZE + Block.SIZE;
+		super (id, index);
 	}
 	
 	public String toString()
 	{
-		return new String ("response (" + id + "," + key + ")");
+		return new String ("response (" + id + "," + index + ")");
 	}
 }

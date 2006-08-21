@@ -5,12 +5,10 @@ package messages;
 
 public class RouteNotFound extends Message
 {
-	public final int id; // The unique ID of the request
-	
 	public RouteNotFound (int id)
 	{
 		this.id = id;
-		size = Message.HEADER_SIZE + Message.ID_SIZE;
+		size = Message.HEADER_SIZE;
 	}
 	
 	public String toString()

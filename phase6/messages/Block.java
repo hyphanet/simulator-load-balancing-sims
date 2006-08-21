@@ -1,14 +1,15 @@
-// A single block of a data transfer (currently 32 blocks per transfer)
+// A single block of a multi-block transfer (currently 32 blocks per transfer)
 
 package messages;
 
 public class Block extends Message
 {
-	public final static int SIZE = 1024; // Bytes
+	public final int index; // Index of this block from 0-31
 	
-	// FIXME: placeholder
-	public Block()
+	public Block (int id, int index)
 	{
-		size = SIZE;
+		this.id = id;
+		this.index = index;
+		size = Message.HEADER_SIZE + Message.DATA_SIZE;
 	}
 }

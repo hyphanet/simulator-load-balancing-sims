@@ -1,19 +1,18 @@
-// A queue storing outgoing messages (including acks and transfers) and their
-// coalescing deadlines
+// A queue storing outgoing messages and their coalescing deadlines
 
 import java.util.LinkedList;
 import messages.Message;
 
-class DeadlineQueue<T extends Message>
+class DeadlineQueue
 {
 	public int size = 0; // Size in bytes
-	private LinkedList<T> messages = new LinkedList<T>();
+	private LinkedList<Message> messages = new LinkedList<Message>();
 	private LinkedList<Double> deadlines = new LinkedList<Double>();
 	
-	public void add (T message, double deadline)
+	public void add (Message m, double deadline)
 	{
-		size += message.size;
-		messages.add (message);
+		size += m.size;
+		messages.add (m);
 		deadlines.add (deadline);
 	}
 	
@@ -25,16 +24,16 @@ class DeadlineQueue<T extends Message>
 	
 	public double deadline()
 	{
-		Double d = deadlines.peek();
-		if (d == null) return Double.POSITIVE_INFINITY;
-		else return d;
+		Double deadline = deadlines.peek();
+		if (deadline == null) return Double.POSITIVE_INFINITY;
+		else return deadline;
 	}
 	
-	public T pop()
+	public Message pop()
 	{
 		deadlines.poll();
-		T message = messages.poll();
-		size -= message.size;
-		return message;
+		Message m = messages.poll();
+		if (m != null) size -= m.size;
+		return m;
 	}
 }

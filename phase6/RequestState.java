@@ -6,10 +6,16 @@ import messages.Request;
 
 class RequestState
 {
+	// State machine
+	public final static int REQUEST_SENT = 1;
+	public final static int TRANSFERRING = 2;
+	
 	public final int id; // The unique ID of the request
 	public final int key; // The requested key
 	public final Peer prev; // The previous hop of the request
 	public final HashSet<Peer> nexts; // Possible next hops
+	public int state = REQUEST_SENT; // State machine
+	private int blockBitmap = 0; // Bitmap of received blocks
 	
 	public RequestState (Request r, Peer prev, Collection<Peer> peers)
 	{
@@ -17,7 +23,7 @@ class RequestState
 		key = r.key;
 		this.prev = prev;
 		nexts = new HashSet<Peer> (peers);
-		if (prev != null) nexts.remove (prev);
+		nexts.remove (prev);
 	}
 	
 	// Find the closest peer to the requested key
@@ -34,6 +40,20 @@ class RequestState
 			}
 		}
 		return bestPeer; // Null if list was empty
+	}
+	
+	// Mark a block as received, return true if it's a duplicate
+	public boolean receivedBlock (int index)
+	{
+		boolean duplicate = (blockBitmap & 1 << index) != 0;
+		blockBitmap |= 1 << index;
+		return duplicate;
+	}
+	
+	// Return true if all blocks have been received
+	public boolean receivedAll()
+	{
+		return blockBitmap == 0xFFFFFFFF;
 	}
 	
 	public String toString()

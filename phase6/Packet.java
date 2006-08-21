@@ -2,28 +2,28 @@
 
 import java.util.ArrayList;
 import messages.Message;
-import messages.Ack;
 
 class Packet
 {
 	public final static int HEADER_SIZE = 80; // Including IP & UDP headers
+	public final static int ACK_SIZE = 4; // Size of an ack in bytes
 	public final static int MAX_SIZE = 1450; // MTU including headers
 	public final static int SENSIBLE_PAYLOAD = 1000; // Coalescing
 	
 	public int src, dest; // Network addresses
 	public int size = HEADER_SIZE; // Size in bytes, including headers
 	public int seq = -1; // Data sequence number (-1 if no data)
-	public ArrayList<Ack> acks = null;
+	public ArrayList<Integer> acks = null;
 	public ArrayList<Message> messages = null;
 	
 	public double sent; // Time at which the packet was (re) transmitted
 	public double latency; // Link latency (stored here for convenience)
 	
-	public void addAck (Ack a)
+	public void addAck (Integer ack)
 	{
-		if (acks == null) acks = new ArrayList<Ack>();
-		acks.add (a);
-		size += a.size;
+		if (acks == null) acks = new ArrayList<Integer>();
+		acks.add (ack);
+		size += ACK_SIZE;
 	}
 	
 	public void addMessage (Message m)
