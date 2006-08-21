@@ -10,7 +10,7 @@ public class Response extends Message
 		this.id = id;
 		this.key = key;
 		size = Message.HEADER_SIZE + Message.ID_SIZE +
-			Message.KEY_SIZE + Message.DATA_SIZE;
+			Message.KEY_SIZE + Block.SIZE;
 	}
 	
 	public String toString()
