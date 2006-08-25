@@ -83,7 +83,7 @@ class Peer
 	// Try to send a packet, return true if a packet was sent
 	private boolean send()
 	{		
-		if (ackQueue.size + searchQueue.size + transferQueue.size ==0) {
+		if (ackQueue.size + searchQueue.size + transferQueue.size == 0){
 			log ("nothing to send");
 			return false;
 		}
@@ -240,11 +240,10 @@ class Peer
 		// Send as many packets as possible
 		while (send());
 		
+		log (txBuffer.size() + " packets in flight");
 		double now = Event.time();
-		if (txBuffer.isEmpty()) {
-			log ("no packets in flight");
-			return deadline (now); // Sleep until the next deadline
-		}
+		if (txBuffer.isEmpty()) return deadline (now);
+		
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt + MAX_DELAY) {
 				// Retransmission timeout

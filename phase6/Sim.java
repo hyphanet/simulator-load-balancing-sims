@@ -23,9 +23,10 @@ class Sim
 		n1.connectBothWays (n3, 0.001);
 		n2.connectBothWays (n3, 0.001);
 		
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 10; i++) {
 			int key = Node.locationToKey (Math.random());
-			n3.cache.put (key);
+			// Half the requests will succeed, half will fail
+			if (i % 2 == 0) n3.cache.put (key);
 			Event.schedule (n0, 0.0, Node.GENERATE_REQUEST, key);
 		}
 		

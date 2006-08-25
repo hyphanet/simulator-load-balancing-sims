@@ -83,89 +83,51 @@ class Node implements EventTarget
 	}
 	
 	// Called by Peer
-	public void handleMessage (Message m, Peer prev)
+	public void handleMessage (Message m, Peer src)
 	{
 		log ("received " + m);
-		if (m instanceof Request) handleRequest ((Request) m, prev);
+		if (m instanceof Request) {
+			if (handleRequest ((Request) m, src))
+				outstandingRequests.remove (m.id);
+		}
 		else {
 			RequestState rs = outstandingRequests.get (m.id);
 			if (rs == null) log ("unexpected " + m);
-			else if (m instanceof Response)
-				handleResponse ((Response) m, rs);
-			else if (m instanceof RouteNotFound)
-				handleRouteNotFound ((RouteNotFound) m, rs);
+			else if (rs.handleMessage (m, src))
+				outstandingRequests.remove (m.id);
 		}
 	}
 	
-	private void handleRequest (Request r, Peer prev)
+	private boolean handleRequest (Request r, Peer prev)
 	{
 		if (!recentlySeenRequests.add (r.id)) {
 			log ("rejecting recently seen " + r);
 			prev.sendMessage (new RouteNotFound (r.id));
-			// Optimisation: prev has seen the request, so remove
-			// it from the list of potential next hops
-			RequestState rs = outstandingRequests.get (r.id);
-			if (rs != null) rs.nexts.remove (prev);
-			return;
+			return false; // Request not completed
 		}
 		if (cache.get (r.key)) {
 			log ("key " + r.key + " found in cache");
 			if (prev == null) log (r + " succeeded locally");
 			else for (int i = 0; i < 32; i++)
 				prev.sendMessage (new Response (r.id, i));
-			return;
+			return true; // Request completed
 		}
 		log ("key " + r.key + " not found in cache");
-		forwardRequest (new RequestState (r, prev, shufflePeers()));
-	}
-	
-	private void handleResponse (Response r, RequestState rs)
-	{
-		rs.state = RequestState.TRANSFERRING;
-		if (rs.receivedBlock (r.index)) return; // Ignore duplicates
-		if (rs.receivedAll()) {
-			cache.put (rs.key);
-			if (rs.prev == null) log (rs + " succeeded");
-			outstandingRequests.remove (rs.id);
-		}
-		// Forward the block
-		if (rs.prev != null) {
-			log ("forwarding " + r);
-			rs.prev.sendMessage (r);
-		}
-	}
-	
-	private void handleRouteNotFound (RouteNotFound r, RequestState rs)
-	{
-		forwardRequest (rs);
-	}
-	
-	private void forwardRequest (RequestState rs)
-	{
-		Peer next = rs.closestPeer();
-		if (next == null) {
-			log ("route not found for " + rs);
-			if (rs.prev == null) log (rs + " failed");
-			else rs.prev.sendMessage (new RouteNotFound (rs.id));
-			outstandingRequests.remove (rs.id);
-		}
-		else {
-			log ("forwarding " + rs + " to " + next.address);
-			next.sendMessage (new Request (rs.id, rs.key));
-			rs.nexts.remove (next);
-			outstandingRequests.put (rs.id, rs);
-		}
+		// Forward the request and store the request state
+		RequestState rs = new RequestState (r, this, prev, peers());
+		outstandingRequests.put (r.id, rs);
+		return rs.forwardRequest();
 	}
 	
 	// Return the list of peers in a random order
-	private ArrayList<Peer> shufflePeers()
+	private ArrayList<Peer> peers()
 	{
 		ArrayList<Peer> copy = new ArrayList<Peer> (peers.values());
 		Collections.shuffle (copy);
 		return copy;
 	}
 	
-	private void log (String message)
+	public void log (String message)
 	{
 		Event.log (net.address + " " + message);
 	}
@@ -183,7 +145,7 @@ class Node implements EventTarget
 	{
 		// Check the peers in a random order each time
 		double deadline = Double.POSITIVE_INFINITY;
-		for (Peer p : shufflePeers())
+		for (Peer p : peers())
 			deadline = Math.min (deadline, p.checkTimeouts());
 		if (deadline == Double.POSITIVE_INFINITY) {
 			log ("stopping retransmission/coalescing timer");

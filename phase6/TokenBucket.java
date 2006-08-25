@@ -17,7 +17,7 @@ class TokenBucket
 		lastUpdated = now;
 		tokens += elapsed * rate;
 		if (tokens > size) tokens = size;
-		Event.log (tokens + " tokens available");
+		// Event.log (tokens + " tokens available");
 		return (int) tokens;
 	}
 	
