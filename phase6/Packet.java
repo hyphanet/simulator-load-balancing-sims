@@ -32,4 +32,9 @@ class Packet
 		messages.add (m);
 		size += m.size;
 	}
+	
+	public String toString()
+	{
+		return new String (src + ":" + dest + ":" + seq);
+	}
 }

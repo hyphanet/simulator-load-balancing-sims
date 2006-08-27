@@ -23,7 +23,10 @@ class Sim
 		n1.connectBothWays (n3, 0.001);
 		n2.connectBothWays (n3, 0.001);
 		
-		for (int i = 0; i < 10; i++) {
+		// DEBUG
+		n2.faulty = true;
+		
+		for (int i = 0; i < 4; i++) {
 			int key = Node.locationToKey (Math.random());
 			// Half the requests will succeed, half will fail
 			if (i % 2 == 0) n3.storeChk (key);

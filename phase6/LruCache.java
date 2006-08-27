@@ -41,6 +41,6 @@ class LruCache<Key>
 	
 	private void log (String message)
 	{
-		Event.log (message);
+		// Event.log (message);
 	}
 }

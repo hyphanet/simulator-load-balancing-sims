@@ -24,6 +24,6 @@ class TokenBucket
 	public void remove (int t)
 	{
 		tokens -= t; // Counter can go negative
-		Event.log (t + " tokens removed, " + tokens + " available");
+		// Event.log (t + " tokens removed, " + tokens + " available");
 	}
 }

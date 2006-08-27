@@ -25,6 +25,8 @@ class Node implements EventTarget
 	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false; // Is the timer running?
 	
+	public boolean faulty = false; // DEBUG
+	
 	public Node (double txSpeed, double rxSpeed)
 	{
 		location = Math.random();
@@ -96,7 +98,7 @@ class Node implements EventTarget
 	public void startTimer()
 	{
 		if (timerRunning) return;
-		log ("starting retransmission/coalescing timer");
+		// log ("starting retransmission/coalescing timer");
 		Event.schedule (this, Peer.MAX_DELAY, CHECK_TIMEOUTS, null);
 		timerRunning = true;
 	}
@@ -113,31 +115,35 @@ class Node implements EventTarget
 	public void handleMessage (Message m, Peer src)
 	{
 		log ("received " + m);
-		if (m instanceof ChkRequest) {
-			if (handleChkRequest ((ChkRequest) m, src))
-				chkRequests.remove (m.id); // Completed
-		}
+		if (m instanceof ChkRequest)
+			handleChkRequest ((ChkRequest) m, src);
 		else {
 			ChkRequestHandler rh = chkRequests.get (m.id);
 			if (rh == null) log ("no request handler for " + m);
-			else if (rh.handleMessage (m, src))
-				chkRequests.remove (m.id); // Completed
+			else rh.handleMessage (m, src);
 		}
 	}
 	
-	private boolean handleChkRequest (ChkRequest r, Peer prev)
+	private void handleChkRequest (ChkRequest r, Peer prev)
 	{
 		if (!recentlySeenRequests.add (r.id)) {
 			log ("rejecting recently seen " + r);
 			prev.sendMessage (new RejectedLoop (r.id));
-			// Optimisation: the previous hop has already seen
-			// this request, so don't ask it in the future
+			// Don't forward the same request back to prev
 			ChkRequestHandler rh = chkRequests.get (r.id);
 			if (rh != null) rh.removeNextHop (prev);
-			return false; // Request not completed
+			return;
 		}
 		// Accept the request
-		if (prev != null) prev.sendMessage (new Accepted (r.id));
+		if (prev != null) {
+			log ("accepting " + r);
+			prev.sendMessage (new Accepted (r.id));
+		}
+		// DEBUG
+		if (faulty) {
+			log ("DEBUG: dropping " + r);
+			return;
+		}
 		// If the key is in the store, return it
 		if (chkStore.get (r.key)) {
 			log ("key " + r.key + " found in CHK store");
@@ -147,7 +153,8 @@ class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
-			return true; // Request completed
+			chkRequestCompleted (r.id);
+			return;
 		}
 		log ("key " + r.key + " not found in CHK store");
 		// If the key is in the cache, return it
@@ -159,13 +166,20 @@ class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
-			return true; // Request completed
+			chkRequestCompleted (r.id);
+			return;
 		}
 		log ("key " + r.key + " not found in CHK cache");
 		// Forward the request and store the request state
 		ChkRequestHandler rh = new ChkRequestHandler (r, this, prev);
 		chkRequests.put (r.id, rh);
-		return rh.forwardRequest();
+		rh.forwardRequest();
+	}
+	
+	// Remove a completed request from the list of pending requests
+	public void chkRequestCompleted (int id)
+	{
+		chkRequests.remove (id);
 	}
 	
 	// Return the list of peers in a random order
@@ -197,7 +211,7 @@ class Node implements EventTarget
 		for (Peer p : peers())
 			deadline = Math.min (deadline, p.checkTimeouts());
 		if (deadline == Double.POSITIVE_INFINITY) {
-			log ("stopping retransmission/coalescing timer");
+			// log ("stopping retransmission/coalescing timer");
 			timerRunning = false;
 		}
 		else {
