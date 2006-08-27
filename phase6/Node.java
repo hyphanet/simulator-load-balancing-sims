@@ -139,18 +139,14 @@ class Node implements EventTarget
 			log ("accepting " + r);
 			prev.sendMessage (new Accepted (r.id));
 		}
-		// DEBUG
-		if (faulty) {
-			log ("DEBUG: dropping " + r);
-			return;
-		}
 		// If the key is in the store, return it
 		if (chkStore.get (r.key)) {
 			log ("key " + r.key + " found in CHK store");
 			if (prev == null) log (r + " succeeded locally");
 			else {
 				prev.sendMessage (new ChkDataFound (r.id));
-				for (int i = 0; i < 32; i++)
+				// DEBUG
+				if (!faulty) for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
 			chkRequestCompleted (r.id);
@@ -163,7 +159,8 @@ class Node implements EventTarget
 			if (prev == null) log (r + " succeeded locally");
 			else {
 				prev.sendMessage (new ChkDataFound (r.id));
-				for (int i = 0; i < 32; i++)
+				// DEBUG
+				if (!faulty) for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
 			chkRequestCompleted (r.id);

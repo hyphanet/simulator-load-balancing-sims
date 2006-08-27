@@ -28,8 +28,9 @@ class Sim
 		
 		for (int i = 0; i < 4; i++) {
 			int key = Node.locationToKey (Math.random());
-			// Half the requests will succeed, half will fail
+			// Half the requests will succeed, half will time out
 			if (i % 2 == 0) n3.storeChk (key);
+			else n2.storeChk (key);
 			Event.schedule (n0, 0.0, Node.GENERATE_REQUEST, key);
 		}
 		

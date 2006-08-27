@@ -10,7 +10,7 @@ class ChkRequestHandler implements EventTarget
 	public final static int REQUEST_SENT = 1;
 	public final static int ACCEPTED = 2;
 	public final static int TRANSFERRING = 3;
-	public final static int FAILED = 4;
+	public final static int COMPLETED = 4;
 	
 	public final int id; // The unique ID of the request
 	public final int key; // The requested key
@@ -65,8 +65,10 @@ class ChkRequestHandler implements EventTarget
 	private void handleChkDataFound (ChkDataFound df)
 	{
 		if (state != ACCEPTED) node.log (df + " out of order");
-		state = TRANSFERRING;
 		if (prev != null) prev.sendMessage (df); // Forward the message
+		state = TRANSFERRING;
+		// Wait 5 minutes for the transfer to complete
+		Event.schedule (this, 300.0, TRANSFER_TIMEOUT, next);
 	}
 	
 	private void handleDataNotFound (DataNotFound dnf)
@@ -75,6 +77,7 @@ class ChkRequestHandler implements EventTarget
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (dnf); // Forward the message
 		node.chkRequestCompleted (id);
+		state = COMPLETED;
 	}
 	
 	private void handleBlock (Block b)
@@ -91,6 +94,7 @@ class ChkRequestHandler implements EventTarget
 			node.storeChk (key);
 			if (prev == null) node.log (this + " succeeded");
 			node.chkRequestCompleted (id);
+			state = COMPLETED;
 		}
 	}
 	
@@ -102,7 +106,7 @@ class ChkRequestHandler implements EventTarget
 			if (prev == null) node.log (this + " failed");
 			else prev.sendMessage (new RouteNotFound (id));
 			node.chkRequestCompleted (id);
-			state = FAILED;
+			state = COMPLETED;
 		}
 		else {
 			node.log ("forwarding " + this + " to " + next.address);
@@ -154,7 +158,7 @@ class ChkRequestHandler implements EventTarget
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (state != REQUEST_SENT) return; // Peer has already answered
-		node.log (this + " search timed out waiting for " + p);
+		node.log (this + " accepted timeout waiting for " + p);
 		forwardRequest(); // Try another peer
 	}
 	
@@ -162,20 +166,42 @@ class ChkRequestHandler implements EventTarget
 	private void fetchTimeout (Peer p)
 	{
 		if (state != ACCEPTED) return; // Peer has already answered
-		node.log (this + " transfer timed out waiting for " + p);
+		node.log (this + " fetch timeout waiting for " + p);
 		if (prev == null) node.log (this + " failed");
-		else prev.sendMessage (new DataNotFound (id));
 		node.chkRequestCompleted (id);
+		state = COMPLETED;
+	}
+	
+	// Event callback
+	private void transferTimeout (Peer p)
+	{
+		if (state != TRANSFERRING) return; // Transfer has completed
+		node.log (this + " transfer timeout waiting for " + p);
+		if (prev == null) node.log (this + " failed");
+		node.chkRequestCompleted (id);
+		state = COMPLETED;
 	}
 	
 	// EventTarget interface
 	public void handleEvent (int type, Object data)
 	{
-		if (type == ACCEPTED_TIMEOUT) acceptedTimeout ((Peer) data);
-		else if (type == FETCH_TIMEOUT) fetchTimeout ((Peer) data);
+		switch (type) {
+			case ACCEPTED_TIMEOUT:
+			acceptedTimeout ((Peer) data);
+			break;
+			
+			case FETCH_TIMEOUT:
+			fetchTimeout ((Peer) data);
+			break;
+			
+			case TRANSFER_TIMEOUT:
+			transferTimeout ((Peer) data);
+			break;
+		}
 	}
 	
 	// Each EventTarget class has its own event codes
 	private final static int ACCEPTED_TIMEOUT = 1;
 	private final static int FETCH_TIMEOUT = 2;
+	private final static int TRANSFER_TIMEOUT = 3;
 }
