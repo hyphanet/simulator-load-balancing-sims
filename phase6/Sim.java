@@ -6,7 +6,7 @@ class Sim
 {
 	public static void main (String[] args)
 	{		
-		double txSpeed = 15000, rxSpeed = 15000; // Bytes per second
+		double txSpeed = 20000, rxSpeed = 20000; // Bytes per second
 		// rxSpeed = Math.exp (rand.nextGaussian() + 11.74);
 		// txSpeed = rxSpeed / 5.0;
 		
@@ -26,7 +26,7 @@ class Sim
 		for (int i = 0; i < 10; i++) {
 			int key = Node.locationToKey (Math.random());
 			// Half the requests will succeed, half will fail
-			if (i % 2 == 0) n3.cache.put (key);
+			if (i % 2 == 0) n3.storeChk (key);
 			Event.schedule (n0, 0.0, Node.GENERATE_REQUEST, key);
 		}
 		

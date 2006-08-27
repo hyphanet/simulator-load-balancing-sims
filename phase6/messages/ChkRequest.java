@@ -1,13 +1,13 @@
 package messages;
 
-public class Request extends Message
+public class ChkRequest extends Message
 {
 	private static int nextId = 0;
 	
 	public final int key; // The requested key
 	
 	// Start a new request
-	public Request (int key)
+	public ChkRequest (int key)
 	{
 		id = nextId++;
 		this.key = key;
@@ -15,7 +15,7 @@ public class Request extends Message
 	}
 	
 	// Forward a request
-	public Request (int id, int key)
+	public ChkRequest (int id, int key)
 	{
 		this.id = id;
 		this.key = key;
@@ -24,6 +24,6 @@ public class Request extends Message
 	
 	public String toString()
 	{
-		return new String ("request (" + id + "," + key + ")");
+		return new String ("CHK request (" + id + "," + key + ")");
 	}
 }

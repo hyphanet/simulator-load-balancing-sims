@@ -7,19 +7,21 @@ import messages.*;
 class Node implements EventTarget
 {
 	public final static int STORE_SIZE = 10; // Max number of keys in store
+	public final static int CACHE_SIZE = 10; // Max number of keys in cache
 	public final static double MIN_SLEEP = 0.01; // Seconds
 	public final static double SHORT_SLEEP = 0.05; // Poll the bw limiter
 	
 	// Token bucket bandwidth limiter
-	public final static int BUCKET_RATE = 20000; // Bytes per second
-	public final static int BUCKET_SIZE = 40000; // Burst size in bytes
+	public final static int BUCKET_RATE = 15000; // Bytes per second
+	public final static int BUCKET_SIZE = 60000; // Burst size in bytes
 	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
 	private HashSet<Integer> recentlySeenRequests; // Request IDs
-	private HashMap<Integer,RequestState> outstandingRequests; // By ID
-	public LruCache<Integer> cache; // Datastore containing keys
+	private HashMap<Integer,ChkRequestHandler> chkRequests; // By ID
+	private LruCache<Integer> chkStore; // CHK datastore
+	private LruCache<Integer> chkCache; // CHK datacache
 	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false; // Is the timer running?
 	
@@ -29,8 +31,9 @@ class Node implements EventTarget
 		net = new NetworkInterface (this, txSpeed, rxSpeed);
 		peers = new HashMap<Integer,Peer>();
 		recentlySeenRequests = new HashSet<Integer>();
-		outstandingRequests = new HashMap<Integer,RequestState>();
-		cache = new LruCache<Integer> (STORE_SIZE);
+		chkRequests = new HashMap<Integer,ChkRequestHandler>();
+		chkStore = new LruCache<Integer> (STORE_SIZE);
+		chkCache = new LruCache<Integer> (CACHE_SIZE);
 		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 	}
 	
@@ -65,6 +68,30 @@ class Node implements EventTarget
 		return (int) (location * Integer.MAX_VALUE);
 	}
 	
+	// Add a CHK to the cache and consider adding it to the store
+	public void storeChk (int key)
+	{
+		log ("key " + key + " added to CHK cache");
+		chkCache.put (key);
+		// Add the key to the store if this node is as close to the
+		// key's location as any of its peers
+		if (isClosest (keyToLocation (key))) {
+			log ("key " + key + " added to CHK store");
+			chkStore.put (key);
+		}
+	}
+	
+	// Return true if this node is as close to the target as any peer
+	private boolean isClosest (double target)
+	{
+		double bestDist = Double.POSITIVE_INFINITY;
+		for (Peer peer : peers.values()) {
+			double dist = distance (target, peer.location);
+			if (dist < bestDist) bestDist = dist;
+		}
+		return distance (target, location) <= bestDist;
+	}
+	
 	// Called by Peer
 	public void startTimer()
 	{
@@ -86,41 +113,63 @@ class Node implements EventTarget
 	public void handleMessage (Message m, Peer src)
 	{
 		log ("received " + m);
-		if (m instanceof Request) {
-			if (handleRequest ((Request) m, src))
-				outstandingRequests.remove (m.id);
+		if (m instanceof ChkRequest) {
+			if (handleChkRequest ((ChkRequest) m, src))
+				chkRequests.remove (m.id); // Completed
 		}
 		else {
-			RequestState rs = outstandingRequests.get (m.id);
-			if (rs == null) log ("unexpected " + m);
-			else if (rs.handleMessage (m, src))
-				outstandingRequests.remove (m.id);
+			ChkRequestHandler rh = chkRequests.get (m.id);
+			if (rh == null) log ("no request handler for " + m);
+			else if (rh.handleMessage (m, src))
+				chkRequests.remove (m.id); // Completed
 		}
 	}
 	
-	private boolean handleRequest (Request r, Peer prev)
+	private boolean handleChkRequest (ChkRequest r, Peer prev)
 	{
 		if (!recentlySeenRequests.add (r.id)) {
 			log ("rejecting recently seen " + r);
-			prev.sendMessage (new RouteNotFound (r.id));
+			prev.sendMessage (new RejectedLoop (r.id));
+			// Optimisation: the previous hop has already seen
+			// this request, so don't ask it in the future
+			ChkRequestHandler rh = chkRequests.get (r.id);
+			if (rh != null) rh.removeNextHop (prev);
 			return false; // Request not completed
 		}
-		if (cache.get (r.key)) {
-			log ("key " + r.key + " found in cache");
+		// Accept the request
+		if (prev != null) prev.sendMessage (new Accepted (r.id));
+		// If the key is in the store, return it
+		if (chkStore.get (r.key)) {
+			log ("key " + r.key + " found in CHK store");
 			if (prev == null) log (r + " succeeded locally");
-			else for (int i = 0; i < 32; i++)
-				prev.sendMessage (new Response (r.id, i));
+			else {
+				prev.sendMessage (new ChkDataFound (r.id));
+				for (int i = 0; i < 32; i++)
+					prev.sendMessage (new Block (r.id, i));
+			}
 			return true; // Request completed
 		}
-		log ("key " + r.key + " not found in cache");
+		log ("key " + r.key + " not found in CHK store");
+		// If the key is in the cache, return it
+		if (chkCache.get (r.key)) {
+			log ("key " + r.key + " found in CHK cache");
+			if (prev == null) log (r + " succeeded locally");
+			else {
+				prev.sendMessage (new ChkDataFound (r.id));
+				for (int i = 0; i < 32; i++)
+					prev.sendMessage (new Block (r.id, i));
+			}
+			return true; // Request completed
+		}
+		log ("key " + r.key + " not found in CHK cache");
 		// Forward the request and store the request state
-		RequestState rs = new RequestState (r, this, prev, peers());
-		outstandingRequests.put (r.id, rs);
-		return rs.forwardRequest();
+		ChkRequestHandler rh = new ChkRequestHandler (r, this, prev);
+		chkRequests.put (r.id, rh);
+		return rh.forwardRequest();
 	}
 	
 	// Return the list of peers in a random order
-	private ArrayList<Peer> peers()
+	public ArrayList<Peer> peers()
 	{
 		ArrayList<Peer> copy = new ArrayList<Peer> (peers.values());
 		Collections.shuffle (copy);
@@ -135,9 +184,9 @@ class Node implements EventTarget
 	// Event callback
 	private void generateRequest (int key)
 	{
-		Request r = new Request (key);
-		log ("generating request " + r.id);
-		handleRequest (r, null);
+		ChkRequest r = new ChkRequest (key);
+		log ("generating " + r);
+		handleChkRequest (r, null);
 	}
 	
 	// Event callback

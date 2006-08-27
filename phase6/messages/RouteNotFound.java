@@ -1,6 +1,3 @@
-// Note: for the purposes of this simulation, RejectedLoop and RouteNotFound
-// are equivalent
-
 package messages;
 
 public class RouteNotFound extends Message

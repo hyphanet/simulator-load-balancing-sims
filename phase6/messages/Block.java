@@ -12,4 +12,9 @@ public class Block extends Message
 		this.index = index;
 		size = Message.HEADER_SIZE + Message.DATA_SIZE;
 	}
+	
+	public String toString()
+	{
+		return new String ("block (" + id + "," + index + ")");
+	}
 }
