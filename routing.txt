@@ -160,7 +160,7 @@ SSKInsertSender loop:
 
 If htl==0, return SUCCESS
 If no remaining peers, return ROUTE_NOT_FOUND
-Remove next hop from list of next hops
+Remove next hop from list of potential next hops
 If next hop is further from target than closest location, decrement htl
 
 Send insert to next hop
