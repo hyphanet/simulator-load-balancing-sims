@@ -25,12 +25,7 @@ If not coalesced, create a new RequestSender
 
 Wait for RequestSender to finish
   If RejectedOverload, forward it
-  If CHKDataFound:
-    Start a new BlockTransmitter
-    Wait for incoming transfer to complete
-    If incoming transfer fails, let status=TRANSFER_FAILED and finish
-    If data verifies, add it to the cache, let status=SUCCESS and finish
-    Otherwise let status=VERIFY_FAILURE and finish
+  If incoming transfer starts, start a new BlockTransmitter
 
 (RequestSender finished)
 If TIMED_OUT, INTERNAL_ERROR or VERIFY_FAILURE, send local RejectedOverload
@@ -151,7 +146,7 @@ Wait 60 seconds for DataNotFound, RouteNotFound, RejectedOverload, SSKPubKey, CH
     Return SUCCESS
   If CHKDataFound:
     If key is not a CHK, try another peer
-    Receive data or return transfer failed
+    Receive data or return TRANSFER_FAILED
     Verify data or return VERIFY_FAILURE
     Return SUCCESS
   If SSKDataFound:
