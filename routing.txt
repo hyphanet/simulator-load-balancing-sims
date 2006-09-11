@@ -2,219 +2,235 @@ Max HTL = 10
 
 HTL might not be decremented at max and/or min - each node decides once at startup, to prevent statistical attacks
 
-
-Node.makeRequestSender:
-
-If data is in store, return it
-If there's a transferring RequestSender for the same key, return it
-If htl==0, return null
-If there's a RequestSender for the same key with the same htl, return it
-Start a new RequestSender and return it
+25% chance of decrementing at min, 50% chance of decrementing at max
 
 
-Node.makeInsertSender:
 
-If there's an CHK/SSKInsertSender for the same key with the same htl, return it
-Start a new CHK/SSKInsertSender and return it
+Handling a data request:
 
+If same id was recently completed, send RejectedLoop and return
+If overloaded, send RejectedOverload and return
+If same id is in progress, send RejectedLoop and return
 
-NodeDispatcher.handleDataRequest:
-
-Send RejectedLoop if id was recently completed
-Send RejectedOverload if overloaded
-Send RejectedLoop if id cannot be locked (ie request is in progress)
-Start a new RequestHandler
-
-
-NodeDispatcher.handleInsertRequest:
-
-Send RejectedLoop if id was recently completed
-Send RejectedOverload if overloaded
-Send RejectedLoop if id cannot be locked (ie request is in progress)
-If key is an SSK, start a new SSKInsertHandler
-Otherwise start a new InsertHandler
-
-
-RequestHandler:
-
+(Request accepted)
+If this is the closest node so far, update closest location and reset htl
 Send Accepted
-Create a RequestSender (see above - returns data, null, or a RequestSender)
-If makeRequestSender returns data:
-	If key is an SSK, send DataFound and SSKPubKey if requested, return
-	If key is a CHK, start a new BlockTransmitter and return
-If makeRequestSender returns null (htl==0), send DataNotFound and return
+If data is in store or cache:
+  If key is an SSK, send DataFound and SSKPubKey if requested, return
+  If key is a CHK, start a new BlockTransmitter and return
+If there's a transferring RequestSender with the same key, coalesce
+Otherwise if htl==0, send DataNotFound and return
+If there's a RequestSender with the same key and htl, coalesce
+If not coalesced, create a new RequestSender
 
-Busy-wait (?) for RequestSender to finish
-If RejectedOverload, forward it and continue to wait
-If TIMED_OUT, INTERNAL_ERROR or VERIFY_FAILURE, send local RejectedOverload and return
-If TRANSFER_FAILED, return (previous hop will detect failure)
-If DataNotFound, send DataNotFound and return
-If RouteNotFound, send RouteNotFound and return
-If CHKDataFound, send CHKDataFound, start a new BlockTransmitter and return
-If SSKDataFound, send DataFound and SSKPubKey if requested, return
+Wait for RequestSender to finish
+  If RejectedOverload, forward it
+
+(RequestSender finished)
+If TIMED_OUT, INTERNAL_ERROR or VERIFY_FAILURE, send local RejectedOverload
+If transfer failed, return (previous hop will detect failure)
+If DataNotFound, send DataNotFound
+If RouteNotFound, send RouteNotFound
+If CHKDataFound, send CHKDataFound, start a new BlockTransmitter
+If SSKDataFound, send DataFound and SSKPubKey if requested
 
 
-InsertHandler:
 
+Handling a CHK insert request:
+
+If same id was recently completed, send RejectedLoop and return
+If overloaded, send RejectedOverload and return
+If same id is in progress, send RejectedLoop and return
+
+(Insert accepted)
+If this is the closest node so far, update closest location and reset htl
 Send Accepted
 Wait 10 seconds for a DataInsert
-If peer disconnects, return
-If wait times out, send RejectedTimeout and InsertTransfersCompleted and return
+  If peer disconnects, return
+  If wait times out:
+    Send RejectedTimeout and InsertTransfersCompleted(true), return
 
-DataInsert received
-
-If htl>0, create a CHKInsertSender with Node.makeInsertSender (see above)
+(DataInsert received)
+If htl>0:
+  If there's a CHKInsertSender with the same key and htl, coalesce
+  Otherwise start a new CHKInsertSender
 Start a new DataReceiver
 If htl==0, send InsertReply and finish
 
 Wait for CHKInsertSender to finish
-If incoming transfer fails, kill CHKInsertSender and finish
-If RejectedOverload, forward it and continue to wait
+  If incoming transfer fails, kill CHKInsertSender and finish
+  If RejectedOverload, forward it
+
+(CHKInsertSender finished)
 If TIMED_OUT or INTERNAL_ERROR, send local RejectedOverload and finish
 If ROUTE_NOT_FOUND, send RouteNotFound and finish
 If SUCCESS, send InsertReply and finish
 Otherwise (unknown status code) send local RejectedOverload and finish
 
 Finish:
-	Wait for transfers to complete
-	If incoming transfer failed, send DataInsertRejected
-	Otherwise:
-		Verify data or send DataInsertRejected
-		Store data and send InsertTransfersCompleted
+Wait for transfers to complete
+If incoming transfer failed, send DataInsertRejected and return
+Verify data or send DataInsertRejected and return
+Store data and send InsertTransfersCompleted(transferTimedOut)
 
 
-SSKInsertHandler:
 
+Handling an SSK insert request:
+
+If same id was recently completed, send RejectedLoop and return
+If overloaded, send RejectedOverload and return
+If same id is in progress, send RejectedLoop and return
+
+(Insert accepted)
+If this is the closest node so far, update closest location and reset htl
 Send Accepted, indicating whether public key is needed
 If public key is needed:
-	Wait 10 seconds for previous hop to send public key
-	If peer disconnects, return
-	If wait times out, return
-	If SSKPubKey, send SSKPubKeyAccepted
+  Wait 10 seconds for previous hop to send public key
+    If peer disconnects, return
+    If wait times out, return (no RejectedTimeout?)
+    If SSKPubKey, send SSKPubKeyAccepted
 
-Verify insert or send DataInsertRejected
-If data is in store and doesn't match insert, send SSKDataFound with old data and return
-If htl==0, send FNPInsertReply and finish
-Create an SSKInsertSender with Node.makeInsertSender (see above)
+(Public key received)
+Verify insert or send DataInsertRejected and return
+If data is in store or cache and doesn't match insert:
+  Send SSKDataFound with old data
+  Continue to insert old data instead of new
+If htl==0, send InsertReply, store data and return
+If there's a SSKInsertSender with the same key and htl, coalesce
+Otherwise start a new SSKInsertSender
 
 Wait for SSKInsertSender to finish
-If RejectedOverload, forward it and continue to wait
-If insert collides at next hop, send SSKDataFound to previous hop (and wait?)
-If TIMED_OUT or INTERNAL_ERROR, send local RejectedOverload and finish
-If ROUTE_NOT_FOUND, send RouteNotFound and finish
-If SUCCESS, send InsertReply and finish
-Otherwise (unknown status code) send local RejectedOverload and finish
+  If RejectedOverload, forward it
+  If insert collides at next hop:
+    Forward SSKDataFound to previous hop (where is this verified?)
+
+(SSKInsertSender finished)
+If TIMED_OUT or INTERNAL_ERROR:
+  Send local RejectedOverload, store data and return
+If ROUTE_NOT_FOUND, send RouteNotFound, store data and return
+If SUCCESS, send InsertReply, store data and return
+Otherwise (unknown status code) send local RejectedOverload
 
 
-RequestSender:
 
-HashSet of possible next hops
+RequestSender loop:
 
 If htl==0, return ROUTE_NOT_FOUND
 If no remaining peers, return ROUTE_NOT_FOUND
-Remove next hop from list of next hops
+Remove next hop from list of potential next hops
 If next hop is further from target than closest location, decrement htl
-Send message to next hop
 
+Send request to next hop
 Wait 5 seconds for Accepted, RejectedLoop or RejectedOverload
-If peer disconnects, try another peer
-If wait times out, back off and try another peer
-If local RejectedOverload, back off and try another peer
-If non-local RejectedOverload, forward it and continue to wait
-If RejectedLoop, try another peer
-If anything other than Accepted, try another peer
+  If peer disconnects, try another peer
+  If wait times out, back off and try another peer
+  If local RejectedOverload, back off and try another peer
+  If non-local RejectedOverload, forward it
+  If RejectedLoop, try another peer
+  If anything other than Accepted, try another peer
 
-Request accepted
-
+(Request accepted)
 Wait 60 seconds for DataNotFound, RouteNotFound, RejectedOverload, SSKPubKey, CHKDataFound or SSKDataFound
-If peer disconnects, try another peer
-If wait times out, back off and return TIMED_OUT (why not try another peer?)
-If DataNotFound, return DATA_NOT_FOUND
-If RouteNotFound, let htl=min(htl,newHtl) and try another peer
-If local RejectedOverload, back off and try another peer
-If non-local RejectedOverload, forward it and continue to wait
-If SSKPubKey:
-	If key is not an SSK, try another peer
-	Verify public key or try another peer
-	If data has not been received, continue to wait
-	Verify data or return VERIFY_FAILURE (why not try another peer?)
-If CHKDataFound:
-	If key is not a CHK, try another peer
-	Receive data or return TRANSFER_FAILED (why not try another peer?)
-	Verify data or return VERIFY_FAILURE (why not try another peer?)
-If SSKDataFound:
-	If key is not an SSK, try another peer
-	If public key has not been received, continue to wait
-	Verify data or return VERIFY_FAILURE (why not try another peer?)
+  If peer disconnects, try another peer
+  If wait times out, back off and return TIMED_OUT
+  If DataNotFound, return data not found
+  If RouteNotFound, let htl=min(htl,newHtl) and try another peer
+  If local RejectedOverload, back off and try another peer
+  If non-local RejectedOverload, forward it
+  If SSKPubKey:
+    If key is not an SSK, try another peer
+    Verify public key or try another peer
+    If data has not been received, continue to wait
+    Verify data or return VERIFY_FAILURE
+    Return SUCCESS
+  If CHKDataFound:
+    If key is not a CHK, try another peer
+    Receive data or return transfer failed
+    Verify data or return VERIFY_FAILURE
+    Return SUCCESS
+  If SSKDataFound:
+    If key is not an SSK, try another peer
+    If public key has not been received, continue to wait
+    Verify data or return VERIFY_FAILURE
+    Return SUCCESS
 
 
-SSKInsertSender:
 
-HashSet of possible next hops
+SSKInsertSender loop:
 
 If htl==0, return SUCCESS
 If no remaining peers, return ROUTE_NOT_FOUND
 Remove next hop from list of next hops
 If next hop is further from target than closest location, decrement htl
-Send message to next hop
 
+Send insert to next hop
 Wait 10 seconds for SSKAccepted, RejectedLoop or RejectedOverload
-If peer disconnects, try another peer
-If wait times out, back off and return TIMED_OUT (why not try another peer?)
-If local RejectedOverload, back off and try another peer
-If non-local RejectedOverload, forward it and contiue to wait
-If RejectedLoop, try another peer
-If anything other than Accepted, try another peer
+  If peer disconnects, try another peer
+  If wait times out, back off and try another peer
+  If local RejectedOverload, back off and try another peer
+  If non-local RejectedOverload, forward it
+  If RejectedLoop, try another peer
+  If anything other than Accepted, try another peer
 
-Insert accepted
-
+(Insert accepted)
 If next hop needs public key:
-	Send SSKPubKey
-	Wait 10 seconds for SSKPubKeyAccepted
-	If wait times out, return TIMED_OUT (why not try another peer?)
-
+  Send SSKPubKey
+  Wait 10 seconds for SSKPubKeyAccepted
+    If wait times out, back off and try another peer
 Wait 60 seconds for InsertReply, RejectedOverload, RouteNotFound, DataInsertRejected or SSKDataFound (collision, returns old data)
-If peer disconnects, try another peer
-If wait times out, back off and return TIMED_OUT (why not try another peer?)
-If local RejectedOverload, back off and try another peer
-If non-local RejectedOverload, forward it and continue to wait
-If RouteNotFound, let htl=min(htl,newHtl) and try another peer
-If DataInsertRejected, try another peer
-If SSKDataFound (collision):
-	If new data equals old data (which it shouldn't), try another peer
-	If old data is corrupt, try another peer
-	Let hasCollided=true, hasRecentlyCollided=true, try another peer
-If anything other than InsertReply, return INTERNAL_ERROR
-Return SUCCESS
+  If peer disconnects, try another peer
+  If wait times out, back off and return TIMED_OUT
+  If local RejectedOverload, back off and try another peer
+  If non-local RejectedOverload, forward it
+  If RouteNotFound, let htl=min(htl,newHtl) and try another peer
+  If DataInsertRejected, try another peer
+  If SSKDataFound (collision):
+  	If new data equals old data (which it shouldn't), try another peer
+  	Verify old data or try another peer
+  	Let hasCollided=true, hasRecentlyCollided=true, continue to wait
+  If anything other than InsertReply, return INTERNAL_ERROR
+  Return SUCCESS
 
 
-CHKInsertSender:
 
+CHKInsertSender loop:
+ 
 If htl==0, return SUCCESS
 If no remaining peers, return ROUTE_NOT_FOUND
-Remove next hop from list of next hops
+Remove next hop from list of potential next hops
 If next hop is further from target than closest location, decrement htl
 
+Send insert to next hop
+If incoming transfer fail has failed, return
 Wait 10 seconds for Accepted, RejectedLoop or RejectedOverload
-If wait times out, back off and return TIMED_OUT (why not try another peer?)
-If local RejectedOverload, back off and try another peer
-If non-local RejectedOverload, forward it and continue to wait
-If RejectedLoop, try another peer
-If anything other than Accepted, try another peer
+  If wait times out, back off and try another peer
+  If incoming transfer has failed, return
+  If local RejectedOverload, back off and try another peer
+  If non-local RejectedOverload, forward it
+  If RejectedLoop, try another peer
+  If anything other than Accepted, try another peer
 
-Insert accepted
-
+(Insert accepted)
+If incoming transfer has failed, return
+Send DataInsert
 In another thread:
-	Start the transfer
-	Wait for it to complete (or wait for all transfers to complete?)
-	Wait a further 120 seconds for InsertTransfersCompleted
+  Start outgoing transfer
+  If there's no CompletionWaiter running, start a new CompletionWaiter
 
-Wait 60 seconds for InsertReply, RouteNotFound, DataInsertRejected or RejectedOverload
-If peer disconnects, try another peer
-If wait times out, back off and return TIMED_OUT (why not try another peer?)
-If local RejectedOverload, back off and try another peer
-If non-local RejectedOverload, forward it and continue to wait
-If RouteNotFound, let htl=min(htl,newHtl) and try another peer
-If DataInsertRejected, try another peer
-If anything other than InsertReply, return INTERNAL_ERROR
-Return SUCCESS
+(Transfer started)
+Wait 120 seconds for InsertReply, RouteNotFound, DataInsertRejected or RejectedOverload
+  If incoming transfer has failed, return
+  If peer disconnects, try another peer
+  If wait times out, back off and return TIMED_OUT
+  If local RejectedOverload, back off and try another peer
+  If non-local RejectedOverload, forward it
+  If RouteNotFound, let htl=min(htl,newHtl) and try another peer
+  If DataInsertRejected, try another peer
+  If anything other than InsertReply, return INTERNAL_ERROR
+  Return SUCCESS
+
+CompletionWaiter:
+Wait for insert to finish
+Wait a further 120 seconds for InsertTransfersCompleted from all next hops
+  If wait times out, let transferTimedOut=true
+  If InsertTransfersCompleted indicates a timeout, let transferTimedOut=true
