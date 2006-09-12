@@ -1,4 +1,4 @@
-// The state of an outstanding CHK request, stored at each node along the path
+// The state of an outstanding CHK request as stored at each node along the path
 
 import java.util.LinkedList;
 import messages.*;
@@ -12,8 +12,11 @@ class ChkRequestHandler implements EventTarget
 	public final static int TRANSFERRING = 3;
 	public final static int COMPLETED = 4;
 	
-	public final int id; // The unique ID of the request
-	public final int key; // The requested key
+	private final int id; // The unique ID of the request
+	private final int key; // The requested key
+	private double best; // The best location seen so far
+	private int htl; // Hops to live for backtracking
+	
 	private Node node; // The owner of this RequestHandler
 	private Peer prev; // The previous hop of the request
 	private Peer next = null; // The (current) next hop of the request
@@ -25,10 +28,20 @@ class ChkRequestHandler implements EventTarget
 	{
 		id = r.id;
 		key = r.key;
+		best = r.best;
+		htl = r.htl;
 		this.node = node;
 		this.prev = prev;
 		nexts = new LinkedList<Peer> (node.peers());
 		nexts.remove (prev);
+		// If this is the best node so far, update best & reset htl
+		double target = Node.keyToLocation (key);
+		if (Node.distance (target, node.location)
+		< Node.distance (target, best)) {
+			node.log ("resetting htl of " + this);
+			best = node.location;
+			htl = ChkRequest.MAX_HTL;
+		}
 	}
 	
 	// Remove a peer from the list of candidates for the next hop
@@ -48,6 +61,8 @@ class ChkRequestHandler implements EventTarget
 			handleChkDataFound ((ChkDataFound) m);
 		else if (m instanceof DataNotFound)
 			handleDataNotFound ((DataNotFound) m);
+		else if (m instanceof RouteNotFound)
+			handleRouteNotFound ((RouteNotFound) m);
 		else if (m instanceof Block) handleBlock ((Block) m);
 		else if (m instanceof RouteNotFound) forwardRequest();
 		else if (m instanceof RejectedLoop) forwardRequest();
@@ -57,7 +72,7 @@ class ChkRequestHandler implements EventTarget
 	private void handleAccepted (Accepted a)
 	{
 		if (state != REQUEST_SENT) node.log (a + " out of order");
-		state = ACCEPTED;
+		if (state != TRANSFERRING) state = ACCEPTED;
 		// Wait 60 seconds for the next hop to start sending the data
 		Event.schedule (this, 60.0, FETCH_TIMEOUT, next);
 	}
@@ -80,6 +95,15 @@ class ChkRequestHandler implements EventTarget
 		state = COMPLETED;
 	}
 	
+	private void handleRouteNotFound (RouteNotFound rnf)
+	{
+		if (state != ACCEPTED) node.log (rnf + " out of order");
+		if (rnf.htl < htl) htl = rnf.htl;
+		// Use the remaining htl to try another peer
+		nexts.remove (next);
+		forwardRequest();
+	}
+	
 	private void handleBlock (Block b)
 	{
 		if (state != TRANSFERRING) node.log (b + " out of order");
@@ -89,9 +113,9 @@ class ChkRequestHandler implements EventTarget
 			node.log ("forwarding " + b);
 			prev.sendMessage (b);
 		}
-		// If the transfer is complete, store the data
+		// If the transfer is complete, cache the data
 		if (receivedAll()) {
-			node.storeChk (key);
+			node.cacheChk (key);
 			if (prev == null) node.log (this + " succeeded");
 			node.chkRequestCompleted (id);
 			state = COMPLETED;
@@ -100,26 +124,42 @@ class ChkRequestHandler implements EventTarget
 	
 	public void forwardRequest()
 	{
-		next = closestPeer();
+		// If the request has run out of hops, send DataNotFound
+		if (htl == 0) {
+			node.log ("data not found for " + this);
+			if (prev == null) node.log (this + " failed");
+			else prev.sendMessage (new DataNotFound (id));
+			node.chkRequestCompleted (id);
+			state = COMPLETED;
+			return;
+		}
+		// Forward the request to the best remaining peer
+		next = bestPeer();
 		if (next == null) {
 			node.log ("route not found for " + this);
 			if (prev == null) node.log (this + " failed");
-			else prev.sendMessage (new RouteNotFound (id));
+			else prev.sendMessage (new RouteNotFound (id, htl));
 			node.chkRequestCompleted (id);
 			state = COMPLETED;
+			return;
 		}
-		else {
-			node.log ("forwarding " + this + " to " + next.address);
-			next.sendMessage (new ChkRequest (id, key));
-			nexts.remove (next);
-			state = REQUEST_SENT;
-			// Wait 5 seconds for the next hop to accept the request
-			Event.schedule (this, 5.0, ACCEPTED_TIMEOUT, next);
+		// Decrement htl if next node is not best so far
+		double target = Node.keyToLocation (key);
+		if (Node.distance (target, next.location)
+		> Node.distance (target, best)) {
+			htl = node.decrementHtl (htl);
+			node.log (this + " has htl " + htl);
 		}
+		node.log ("forwarding " + this + " to " + next.address);
+		next.sendMessage (new ChkRequest (id, key, best, htl));
+		nexts.remove (next);
+		state = REQUEST_SENT;
+		// Wait 5 seconds for the next hop to accept the request
+		Event.schedule (this, 5.0, ACCEPTED_TIMEOUT, next);
 	}
 	
-	// Find the closest peer to the requested key
-	private Peer closestPeer ()
+	// Find the best remaining peer
+	private Peer bestPeer ()
 	{
 		double keyLoc = Node.keyToLocation (key);
 		double bestDist = Double.POSITIVE_INFINITY;
@@ -137,8 +177,9 @@ class ChkRequestHandler implements EventTarget
 	// Mark a block as received, return true if it's a duplicate
 	private boolean receivedBlock (int index)
 	{
-		boolean duplicate = (blockBitmap & 1 << index) != 0;
-		blockBitmap |= 1 << index;
+		int mask = 1 << index;
+		boolean duplicate = (blockBitmap & mask) != 0;
+		blockBitmap |= mask;
 		return duplicate;
 	}
 	

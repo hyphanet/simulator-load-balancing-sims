@@ -70,21 +70,8 @@ class Node implements EventTarget
 		return (int) (location * Integer.MAX_VALUE);
 	}
 	
-	// Add a CHK to the cache and consider adding it to the store
-	public void storeChk (int key)
-	{
-		log ("key " + key + " added to CHK cache");
-		chkCache.put (key);
-		// Add the key to the store if this node is as close to the
-		// key's location as any of its peers
-		if (isClosest (keyToLocation (key))) {
-			log ("key " + key + " added to CHK store");
-			chkStore.put (key);
-		}
-	}
-	
 	// Return true if this node is as close to the target as any peer
-	private boolean isClosest (double target)
+	private boolean closerThanPeers (double target)
 	{
 		double bestDist = Double.POSITIVE_INFINITY;
 		for (Peer peer : peers.values()) {
@@ -92,6 +79,29 @@ class Node implements EventTarget
 			if (dist < bestDist) bestDist = dist;
 		}
 		return distance (target, location) <= bestDist;
+	}
+	
+	// Decrement a request or insert's hops to live
+	public int decrementHtl (int htl)
+	{
+		// FIXME: don't always decrement at min/max
+		return htl - 1;
+	}
+	
+	// Add a CHK to the cache
+	public void cacheChk (int key)
+	{
+		log ("key " + key + " added to CHK cache");
+		chkCache.put (key);
+	}
+	
+	// Consider adding a CHK to the store
+	public void storeChk (int key)
+	{
+		if (closerThanPeers (keyToLocation (key))) {
+			log ("key " + key + " added to CHK store");
+			chkStore.put (key);
+		}
 	}
 	
 	// Called by Peer
@@ -195,7 +205,7 @@ class Node implements EventTarget
 	// Event callback
 	private void generateRequest (int key)
 	{
-		ChkRequest r = new ChkRequest (key);
+		ChkRequest r = new ChkRequest (key, location);
 		log ("generating " + r);
 		handleChkRequest (r, null);
 	}
