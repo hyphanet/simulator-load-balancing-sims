@@ -122,6 +122,9 @@ class Peer
 			log ("no bandwidth available for messages");
 		else pack (p); // OK to send data
 		
+		// Don't send empty packets
+		if (p.acks == null && p.messages == null) return false;
+		
 		// If the packet contains data, buffer it for retransmission
 		if (p.messages != null) {
 			p.seq = txSeq++;

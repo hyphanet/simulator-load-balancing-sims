@@ -64,7 +64,6 @@ class ChkRequestHandler implements EventTarget
 		else if (m instanceof RouteNotFound)
 			handleRouteNotFound ((RouteNotFound) m);
 		else if (m instanceof Block) handleBlock ((Block) m);
-		else if (m instanceof RouteNotFound) forwardRequest();
 		else if (m instanceof RejectedLoop) forwardRequest();
 		else node.log ("unexpected type for " + m);
 	}
@@ -100,7 +99,6 @@ class ChkRequestHandler implements EventTarget
 		if (state != ACCEPTED) node.log (rnf + " out of order");
 		if (rnf.htl < htl) htl = rnf.htl;
 		// Use the remaining htl to try another peer
-		nexts.remove (next);
 		forwardRequest();
 	}
 	
