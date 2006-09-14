@@ -25,11 +25,9 @@ class Sim
 		n2.connectBothWays (n3, 0.1);
 		n3.connectBothWays (n4, 0.1);
 		
-		for (int i = 0; i < 10; i++) {
-			int key = Node.locationToKey (Math.random());
-			if (i % 2 == 0) n4.cacheChk (key);
-			Event.schedule (n0, 0.0, Node.GENERATE_REQUEST, key);
-		}
+		int key = Node.locationToKey (Math.random());
+		Event.schedule (n0, 0.0, Node.GENERATE_INSERT, key);
+		Event.schedule (n4, 30.0, Node.GENERATE_REQUEST, key);
 		
 		// Run the simulation
 		Event.run();
