@@ -2,8 +2,8 @@
 
 class CongestionWindow
 {
-	public final static int MIN_CWIND = 3000; // Minimum congestion window
-	public final static int MAX_CWIND = 1000000; // Max congestion window
+	public final static int MIN_CWIND = Packet.MAX_SIZE; // Min window size
+	public final static int MAX_CWIND = 1000000; // Max window size
 	public final static double ALPHA = 0.3125; // AIMD increase parameter
 	public final static double BETA = 0.875; // AIMD decrease parameter
 	public final static double GAMMA = 3.0; // Slow start divisor
