@@ -8,6 +8,8 @@ public class Message
 	public final static int KEY_SIZE = 32; // Size of a routing key, bytes
 	public final static int DATA_SIZE = 1024; // Size of a data block, bytes
 	
+	public static int nextId = 0; // Each request and insert has a unique ID
+	
 	public int size; // Size in bytes
 	public int id; // Unique request ID
 }
