@@ -16,6 +16,6 @@ public class ChkRequest extends Search
 	
 	public String toString()
 	{
-		return new String ("CHK request (" +id+ "," +key+ "," +htl+")");
+		return new String ("CHK request (" + id + "," + key + ")");
 	}
 }

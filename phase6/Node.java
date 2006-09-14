@@ -6,10 +6,7 @@ import messages.*;
 
 class Node implements EventTarget
 {
-	public final static int STORE_SIZE = 10; // Max number of keys in store
-	public final static int CACHE_SIZE = 10; // Max number of keys in cache
-	public final static double MIN_SLEEP = 0.01; // Seconds
-	public final static double SHORT_SLEEP = 0.05; // Poll the bw limiter
+	public final static double SHORT_SLEEP = 0.01; // Poll the bw limiter
 	
 	// Token bucket bandwidth limiter
 	public final static int BUCKET_RATE = 30000; // Bytes per second
@@ -20,8 +17,11 @@ class Node implements EventTarget
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
 	private HashSet<Integer> recentlySeenRequests; // Request IDs
 	private HashMap<Integer,MessageHandler> messageHandlers; // By ID
-	private LruCache<Integer> chkStore; // CHK datastore
-	private LruCache<Integer> chkCache; // CHK datacache
+	private LruCache<Integer> chkStore;
+	private LruCache<Integer> chkCache;
+	private LruCache<Integer> sskStore;
+	private LruCache<Integer> sskCache;
+	private LruCache<Integer> pubKeyCache; // SSK public keys
 	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false; // Is the timer running?
 	
@@ -32,8 +32,11 @@ class Node implements EventTarget
 		peers = new HashMap<Integer,Peer>();
 		recentlySeenRequests = new HashSet<Integer>();
 		messageHandlers = new HashMap<Integer,MessageHandler>();
-		chkStore = new LruCache<Integer> (STORE_SIZE);
-		chkCache = new LruCache<Integer> (CACHE_SIZE);
+		chkStore = new LruCache<Integer> (10);
+		chkCache = new LruCache<Integer> (10);
+		sskStore = new LruCache<Integer> (10);
+		sskCache = new LruCache<Integer> (10);
+		pubKeyCache = new LruCache<Integer> (10);
 		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 	}
 	
@@ -103,6 +106,30 @@ class Node implements EventTarget
 		else log ("key " + key + " not added to CHK store");
 	}
 	
+	// Add an SSK to the cache
+	public void cacheSsk (int key)
+	{
+		log ("key " + key + " added to SSK cache");
+		sskCache.put (key);
+	}
+	
+	// Consider adding an SSK to the store
+	public void storeSsk (int key)
+	{
+		if (closerThanPeers (keyToLocation (key))) {
+			log ("key " + key + " added to SSK store");
+			sskStore.put (key);
+		}
+		else log ("key " + key + " not added to SSK store");
+	}
+	
+	// Add a public key to the cache
+	public void cachePubKey (int key)
+	{
+		log ("public key " + key + " added to cache");
+		pubKeyCache.put (key);
+	}
+	
 	// Called by Peer
 	public void startTimer()
 	{
@@ -128,6 +155,10 @@ class Node implements EventTarget
 			handleChkRequest ((ChkRequest) m, src);
 		else if (m instanceof ChkInsert)
 			handleChkInsert ((ChkInsert) m, src);
+		else if (m instanceof SskRequest)
+			handleSskRequest ((SskRequest) m, src);
+		else if (m instanceof SskInsert)
+			handleSskInsert ((SskInsert) m, src);
 		else {
 			MessageHandler mh = messageHandlers.get (m.id);
 			if (mh == null) log ("no message handler for " + m);
@@ -150,28 +181,33 @@ class Node implements EventTarget
 			log ("accepting " + r);
 			prev.sendMessage (new Accepted (r.id));
 		}
-		// If the key is in the store, return it
+		// If the data is in the store, return it
 		if (chkStore.get (r.key)) {
 			log ("key " + r.key + " found in CHK store");
 			if (prev == null) log (r + " succeeded locally");
-			else prev.sendMessage (new ChkDataFound (r.id));
-			chkRequestCompleted (r.id);
+			else {
+				prev.sendMessage (new ChkDataFound (r.id));
+				for (int i = 0; i < 32; i++)
+					prev.sendMessage (new Block (r.id, i));
+			}
 			return;
 		}
 		log ("key " + r.key + " not found in CHK store");
-		// If the key is in the cache, return it
+		// If the data is in the cache, return it
 		if (chkCache.get (r.key)) {
 			log ("key " + r.key + " found in CHK cache");
 			if (prev == null) log (r + " succeeded locally");
-			else prev.sendMessage (new ChkDataFound (r.id));
-			chkRequestCompleted (r.id);
+			else {
+				prev.sendMessage (new ChkDataFound (r.id));
+				for (int i = 0; i < 32; i++)
+					prev.sendMessage (new Block (r.id, i));
+			}
 			return;
 		}
 		log ("key " + r.key + " not found in CHK cache");
 		// Store the request handler and forward the search
 		ChkRequestHandler rh = new ChkRequestHandler (r, this, prev);
 		messageHandlers.put (r.id, rh);
-		rh.forwardSearch();
 	}
 	
 	private void handleChkInsert (ChkInsert i, Peer prev)
@@ -194,16 +230,85 @@ class Node implements EventTarget
 		messageHandlers.put (i.id, ih);
 	}
 	
-	// Remove a completed request from the list of pending requests
-	public void chkRequestCompleted (int id)
+	private void handleSskRequest (SskRequest r, Peer prev)
 	{
-		messageHandlers.remove (id);
+		if (!recentlySeenRequests.add (r.id)) {
+			log ("rejecting recently seen " + r);
+			prev.sendMessage (new RejectedLoop (r.id));
+			// Don't forward the same search back to prev
+			MessageHandler mh = messageHandlers.get (r.id);
+			if (mh != null) mh.removeNextHop (prev);
+			return;
+		}
+		// Look up the public key
+		boolean pub = pubKeyCache.get (r.key);
+		if (pub) log ("public key " + r.key + " found in cache");
+		else log ("public key " + r.key + " not found in cache");
+		// Accept the search
+		if (prev != null) {
+			log ("accepting " + r);
+			prev.sendMessage (new Accepted (r.id));
+		}
+		// If the data is in the store, return it
+		if (pub && sskStore.get (r.key)) {
+			log ("key " + r.key + " found in SSK store");
+			if (prev == null) log (r + " succeeded locally");
+			else {
+				prev.sendMessage (new SskDataFound (r.id));
+				if (r.needPubKey)
+					prev.sendMessage
+						(new SskPubKey (r.id, r.key));
+			}
+			return;
+		}
+		log ("key " + r.key + " not found in SSK store");
+		// If the data is in the cache, return it
+		if (pub && sskCache.get (r.key)) {
+			log ("key " + r.key + " found in SSK cache");
+			if (prev == null) log (r + " succeeded locally");
+			else {
+				prev.sendMessage (new SskDataFound (r.id));
+				if (r.needPubKey)
+					prev.sendMessage
+						(new SskPubKey (r.id, r.key));
+			}
+			return;
+		}
+		log ("key " + r.key + " not found in SSK cache");
+		// Store the request handler and forward the search
+		SskRequestHandler rh = new SskRequestHandler (r,this,prev,!pub);
+		messageHandlers.put (r.id, rh);
 	}
 	
-	// Remove a completed insert from the list of pending inserts
-	public void chkInsertCompleted (int id)
+	private void handleSskInsert (SskInsert i, Peer prev)
 	{
-		messageHandlers.remove (id);
+		if (!recentlySeenRequests.add (i.id)) {
+			log ("rejecting recently seen " + i);
+			prev.sendMessage (new RejectedLoop (i.id));
+			// Don't forward the same search back to prev
+			MessageHandler mh = messageHandlers.get (i.id);
+			if (mh != null) mh.removeNextHop (prev);
+			return;
+		}
+		// Look up the public key
+		boolean pub = pubKeyCache.get (i.key);
+		if (pub) log ("public key " + i.key + " found in cache");
+		else log ("public key " + i.key + " not found in cache");
+		// Accept the search
+		if (prev != null) {
+			log ("accepting " + i);
+			prev.sendMessage (new SskAccepted (i.id, !pub));
+		}
+		// Store the insert handler and possibly wait for the pub key
+		SskInsertHandler ih = new SskInsertHandler (i,this,prev,!pub);
+		messageHandlers.put (i.id, ih);
+	}
+	
+	public void removeMessageHandler (int id)
+	{
+		MessageHandler mh = messageHandlers.remove (id);
+		if (mh == null) log ("no message handler to remove for " + id);
+		else log ("removing message handler for " + id);
 	}
 	
 	// Return the list of peers in a random order
@@ -219,16 +324,16 @@ class Node implements EventTarget
 		Event.log (net.address + " " + message);
 	}
 	
-	// Event callback
-	private void generateRequest (int key)
+	// Event callbacks
+	
+	private void generateChkRequest (int key)
 	{
 		ChkRequest cr = new ChkRequest (key, location);
 		log ("generating " + cr);
 		handleChkRequest (cr, null);
 	}
 	
-	// Event callback
-	private void generateInsert (int key)
+	private void generateChkInsert (int key)
 	{
 		ChkInsert ci = new ChkInsert (key, location);
 		log ("generating " + ci);
@@ -238,7 +343,21 @@ class Node implements EventTarget
 			handleMessage (new Block (ci.id, i), null);
 	}
 	
-	// Event callback
+	private void generateSskRequest (int key)
+	{
+		SskRequest sr = new SskRequest (key, location, true);
+		log ("generating " + sr);
+		handleSskRequest (sr, null);
+	}
+	
+	private void generateSskInsert (int key)
+	{
+		SskInsert si = new SskInsert (key, location);
+		log ("generating " + si);
+		pubKeyCache.put (key);
+		handleSskInsert (si, null);
+	}
+	
 	private void checkTimeouts()
 	{
 		// Check the peers in a random order each time
@@ -251,7 +370,7 @@ class Node implements EventTarget
 		}
 		else {
 			double sleep = deadline - Event.time(); // Can be < 0
-			if (sleep < MIN_SLEEP) sleep = MIN_SLEEP;
+			if (sleep < SHORT_SLEEP) sleep = SHORT_SLEEP;
 			// log ("sleeping for " + sleep + " seconds");
 			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);
 		}
@@ -261,12 +380,20 @@ class Node implements EventTarget
 	public void handleEvent (int type, Object data)
 	{
 		switch (type) {
-			case GENERATE_REQUEST:
-			generateRequest ((Integer) data);
+			case GENERATE_CHK_REQUEST:
+			generateChkRequest ((Integer) data);
 			break;
 			
-			case GENERATE_INSERT:
-			generateInsert ((Integer)data);
+			case GENERATE_CHK_INSERT:
+			generateChkInsert ((Integer) data);
+			break;
+			
+			case GENERATE_SSK_REQUEST:
+			generateSskRequest ((Integer) data);
+			break;
+			
+			case GENERATE_SSK_INSERT:
+			generateSskInsert ((Integer) data);
 			break;
 			
 			case CHECK_TIMEOUTS:
@@ -276,7 +403,9 @@ class Node implements EventTarget
 	}
 	
 	// Each EventTarget class has its own event codes
-	public final static int GENERATE_REQUEST = 1;
-	public final static int GENERATE_INSERT = 2;
-	private final static int CHECK_TIMEOUTS = 3;
+	public final static int GENERATE_CHK_REQUEST = 1;
+	public final static int GENERATE_CHK_INSERT = 2;
+	public final static int GENERATE_SSK_REQUEST = 3;
+	public final static int GENERATE_SSK_INSERT = 4;
+	private final static int CHECK_TIMEOUTS = 5;
 }

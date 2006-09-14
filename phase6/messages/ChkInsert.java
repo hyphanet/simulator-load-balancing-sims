@@ -16,6 +16,6 @@ public class ChkInsert extends Search
 	
 	public String toString()
 	{
-		return new String ("CHK insert (" +id+ "," +key+ "," +htl+ ")");
+		return new String ("CHK insert (" + id + "," + key + ")");
 	}
 }

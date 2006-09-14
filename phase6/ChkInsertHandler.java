@@ -95,7 +95,7 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 		for (int i = 0; i < 32; i++)
 			if (blocks[i] != null) next.sendMessage (blocks[i]);
 		// Wait for TransfersCompleted (FIXME: check real timeout)
-		Event.schedule (this, 120.0, TRANSFER_OUT_TIMEOUT, next);
+		Event.schedule (this, 240.0, TRANSFER_OUT_TIMEOUT, next);
 	}
 	
 	private void handleRejectedLoop (RejectedLoop rl)
@@ -149,7 +149,7 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 			node.log (this + " has htl " + htl);
 		}
 		node.log ("forwarding " + this + " to " + next.address);
-		next.sendMessage (new ChkInsert (id, key, closest, htl));
+		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);
 		searchState = SENT;
 		// Wait 10 seconds for the next hop to accept the search
@@ -170,12 +170,17 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 		searchState = COMPLETED;
 		if (prev == null) node.log (this + " completed");
 		else prev.sendMessage (new TransfersCompleted (id));
-		node.chkInsertCompleted (id);
+		node.removeMessageHandler (id);
+	}
+	
+	protected Search makeSearchMessage()
+	{
+		return new ChkInsert (id, key, closest, htl);
 	}
 	
 	public String toString()
 	{
-		return new String ("CHK insert (" +id+ "," +key+ "," +htl+ ")");
+		return new String ("CHK insert (" + id + "," + key + ")");
 	}
 	
 	// Event callbacks

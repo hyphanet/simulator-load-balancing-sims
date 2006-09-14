@@ -65,5 +65,7 @@ abstract class MessageHandler
 		return closestPeer; // Null if the list was empty
 	}
 	
-	public abstract void handleMessage (Message m, Peer src);	
+	public abstract void handleMessage (Message m, Peer src);
+	
+	protected abstract Search makeSearchMessage();
 }
