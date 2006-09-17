@@ -33,6 +33,7 @@ class Peer
 	private DeadlineQueue transferQueue; // Outgoing transfers
 	private CongestionWindow window; // AIMD congestion window
 	private double lastTransmission = 0.0; // Clock time
+	private boolean tgif = false; // "Transfers go in first" toggle
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -213,20 +214,29 @@ class Peer
 	// Add messages to a packet
 	private void pack (Packet p)
 	{
-		// Add one search, then one transfer, then as many searches as
-		// will fit. This ensures that neither searches nor transfers
-		// starve as long as at least *some* searches are small enough
-		// to share a packet with a transfer.
-		
-		if (searchQueue.size > 0
-		&& p.size + searchQueue.headSize() <= Packet.MAX_SIZE)
-			p.addMessage (searchQueue.pop());
-		if (transferQueue.size > 0
-		&& p.size + transferQueue.headSize() <= Packet.MAX_SIZE)
-			p.addMessage (transferQueue.pop());
-		while (searchQueue.size > 0
-		&& p.size + searchQueue.headSize() <= Packet.MAX_SIZE)
-			p.addMessage (searchQueue.pop());
+		// Alternate between giving searches and transfers priority
+		if (tgif) {
+			// Transfers go in first
+			while (transferQueue.size > 0
+			&& p.size + transferQueue.headSize() <= Packet.MAX_SIZE)
+				p.addMessage (transferQueue.pop());
+			// Fill any remaining space with searches
+			while (searchQueue.size > 0
+			&& p.size + searchQueue.headSize() <= Packet.MAX_SIZE)
+				p.addMessage (searchQueue.pop());
+			tgif = false;
+		}
+		else {
+			// Searches go in first
+			while (searchQueue.size > 0
+			&& p.size + searchQueue.headSize() <= Packet.MAX_SIZE)
+				p.addMessage (searchQueue.pop());
+			// Fill any remaining space with transfers
+			while (transferQueue.size > 0
+			&& p.size + transferQueue.headSize() <= Packet.MAX_SIZE)
+				p.addMessage (transferQueue.pop());
+			tgif = true;
+		}
 	}
 	
 	// Remove messages from a packet and deliver them to the node

@@ -28,6 +28,9 @@ class Sim
 		int key = Node.locationToKey (Math.random());
 		Event.schedule (n0, 0.0, Node.GENERATE_SSK_INSERT, key);
 		Event.schedule (n4, 30.0, Node.GENERATE_SSK_REQUEST, key);
+		key = Node.locationToKey (Math.random());
+		Event.schedule (n3, 60.0, Node.GENERATE_CHK_INSERT, key);
+		Event.schedule (n1, 90.0, Node.GENERATE_CHK_REQUEST, key);
 		
 		// Run the simulation
 		Event.run();
