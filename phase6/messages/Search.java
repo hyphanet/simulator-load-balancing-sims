@@ -2,7 +2,7 @@ package messages;
 
 public class Search extends Message
 {
-	public final static int MAX_HTL = 5; // Maximum amount of backtracking
+	public final static int MAX_HTL = 2; // Maximum amount of backtracking
 	
 	public final int key; // The target of the search
 	public double closest; // The closest location seen so far

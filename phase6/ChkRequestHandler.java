@@ -37,8 +37,8 @@ class ChkRequestHandler extends RequestHandler
 	
 	private void handleChkDataFound (ChkDataFound df)
 	{
-		if (state != ACCEPTED) node.log (df + " out of order");
-		state = TRANSFERRING;
+		if (searchState != ACCEPTED) node.log (df + " out of order");
+		searchState = TRANSFERRING;
 		if (prev != null) prev.sendMessage (df); // Forward the message
 		// Wait for the transfer to complete (FIXME: check real timeout)
 		Event.schedule (this, 120.0, TRANSFER_TIMEOUT, next);
@@ -46,7 +46,7 @@ class ChkRequestHandler extends RequestHandler
 	
 	private void handleBlock (Block b)
 	{
-		if (state != TRANSFERRING) node.log (b + " out of order");
+		if (searchState != TRANSFERRING) node.log (b + " out of order");
 		if (received[b.index]) return; // Ignore duplicates
 		received[b.index] = true;
 		blocksReceived++;

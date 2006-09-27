@@ -13,24 +13,20 @@ class Sim
 		Network.reorder = true;
 		Network.lossRate = 0.001;
 		
-		Node n0 = new Node (txSpeed, rxSpeed);
-		Node n1 = new Node (txSpeed, rxSpeed);
-		Node n2 = new Node (txSpeed, rxSpeed);
-		Node n3 = new Node (txSpeed, rxSpeed);
-		Node n4 = new Node (txSpeed, rxSpeed);
-		
-		n0.connectBothWays (n1, 0.1);
-		n1.connectBothWays (n2, 0.1);
-		n1.connectBothWays (n3, 0.1);
-		n2.connectBothWays (n3, 0.1);
-		n3.connectBothWays (n4, 0.1);
+		Node[] nodes = new Node[20];
+		for (int i = 0; i < 20; i++)
+			nodes[i] = new Node (0.05 * i, txSpeed, rxSpeed);
+		for (int i = 0; i < 20; i++) {
+			nodes[i].connectBothWays (nodes[(i+1)%20], 0.1);
+			nodes[i].connectBothWays (nodes[(i+2)%20], 0.1);
+		}
 		
 		int key = Node.locationToKey (Math.random());
-		Event.schedule (n0, 0.0, Node.GENERATE_SSK_INSERT, key);
-		Event.schedule (n4, 30.0, Node.GENERATE_SSK_REQUEST, key);
+		Event.schedule (nodes[0], 0.0, Node.GENERATE_SSK_INSERT, key);
+		Event.schedule (nodes[10], 30.0, Node.GENERATE_SSK_REQUEST,key);
 		key = Node.locationToKey (Math.random());
-		Event.schedule (n3, 60.0, Node.GENERATE_CHK_INSERT, key);
-		Event.schedule (n1, 90.0, Node.GENERATE_CHK_REQUEST, key);
+		Event.schedule (nodes[5], 60.0, Node.GENERATE_CHK_INSERT, key);
+		Event.schedule (nodes[15], 90.0, Node.GENERATE_CHK_REQUEST,key);
 		
 		// Run the simulation
 		Event.run();

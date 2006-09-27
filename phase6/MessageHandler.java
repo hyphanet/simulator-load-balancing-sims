@@ -22,6 +22,7 @@ abstract class MessageHandler
 	protected Peer prev; // The previous hop of the search
 	protected Peer next = null; // The (current) next hop of the search
 	protected LinkedList<Peer> nexts; // Candidates for the next hop
+	protected int searchState = STARTED; // The state of the search
 	
 	public MessageHandler (Search s, Node node, Peer prev)
 	{

@@ -5,7 +5,7 @@ import messages.*;
 
 class SskInsertHandler extends MessageHandler implements EventTarget
 {
-	private int state = STARTED; // State of search
+	private int searchState = STARTED; // searchState of search
 	private SskPubKey pubKey = null; 
 	
 	public SskInsertHandler (SskInsert i, Node node,
@@ -45,7 +45,7 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleSskPubKey (SskPubKey pk)
 	{
-		if (state != STARTED) node.log (pk + " out of order");
+		if (searchState != STARTED) node.log (pk + " out of order");
 		pubKey = pk;
 		node.cachePubKey (key);
 		node.cacheSsk (key);
@@ -55,8 +55,8 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleSskAccepted (SskAccepted sa)
 	{
-		if (state != SENT) node.log (sa + " out of order");
-		state = ACCEPTED;
+		if (searchState != SENT) node.log (sa + " out of order");
+		searchState = ACCEPTED;
 		// Wait 60 seconds for a reply to the search
 		Event.schedule (this, 60.0, SEARCH_TIMEOUT, next);
 		// Send the public key if requested
@@ -65,13 +65,13 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleRejectedLoop (RejectedLoop rl)
 	{
-		if (state != SENT) node.log (rl + " out of order");
+		if (searchState != SENT) node.log (rl + " out of order");
 		forwardSearch();
 	}
 	
 	private void handleRouteNotFound (RouteNotFound rnf)
 	{
-		if (state != ACCEPTED) node.log (rnf + " out of order");
+		if (searchState != ACCEPTED) node.log (rnf + " out of order");
 		if (rnf.htl < htl) htl = rnf.htl;
 		// Use the remaining htl to try another peer
 		forwardSearch();
@@ -79,7 +79,7 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleInsertReply (InsertReply ir)
 	{
-		if (state != ACCEPTED) node.log (ir + " out of order");
+		if (searchState != ACCEPTED) node.log (ir + " out of order");
 		if (prev == null) node.log (this + " succeeded");
 		else prev.sendMessage (ir); // Forward the message
 		finish();
@@ -108,21 +108,20 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 		// Decrement the htl if the next node is not the closest so far
 		double target = Node.keyToLocation (key);
 		if (Node.distance (target, next.location)
-		> Node.distance (target, closest)) {
+		> Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
-			node.log (this + " has htl " + htl);
-		}
+		node.log (this + " has htl " + htl);
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);
-		state = SENT;
+		searchState = SENT;
 		// Wait 10 seconds for the next hop to accept the search
 		Event.schedule (this, 10.0, ACCEPTED_TIMEOUT, next);
 	}
 	
 	private void finish()
 	{
-		state = COMPLETED;
+		searchState = COMPLETED;
 		node.removeMessageHandler (id);
 	}
 	
@@ -140,7 +139,7 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void keyTimeout()
 	{
-		if (state != STARTED) return;
+		if (searchState != STARTED) return;
 		node.log (this + " key timeout waiting for " + prev);
 		finish();
 	}
@@ -148,7 +147,7 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	private void acceptedTimeout (Peer p)
 	{
 		if (p != next) return; // We've already moved on to another peer
-		if (state != SENT) return;
+		if (searchState != SENT) return;
 		node.log (this + " accepted timeout waiting for " + p);
 		forwardSearch(); // Try another peer
 	}
@@ -156,7 +155,7 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	private void searchTimeout (Peer p)
 	{
 		if (p != next) return; // We've already moved on to another peer
-		if (state != ACCEPTED) return;
+		if (searchState != ACCEPTED) return;
 		node.log (this + " search timeout waiting for " + p);
 		if (prev == null) node.log (this + " failed");
 		finish();

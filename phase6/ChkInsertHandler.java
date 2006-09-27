@@ -6,7 +6,6 @@ import messages.*;
 class ChkInsertHandler extends MessageHandler implements EventTarget
 {
 	private int inState = STARTED; // State of incoming transfer
-	private int searchState = STARTED; // State of search
 	private HashSet<Peer> receivers; // Peers that should receive data
 	private Block[] blocks; // Store incoming blocks for forwarding
 	private int blocksReceived = 0;
@@ -78,8 +77,7 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void handleCompleted (TransfersCompleted tc, Peer src)
 	{
 		receivers.remove (src);
-		if (src == next) forwardSearch();
-		else considerFinishing();
+		considerFinishing();
 	}
 	
 	private void handleAccepted (Accepted a)
@@ -117,6 +115,8 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
 		if (prev == null) node.log (this + " succeeded");
 		else prev.sendMessage (ir); // Forward the message
+		searchState = COMPLETED;
+		considerFinishing();
 	}
 	
 	public void forwardSearch()
@@ -144,10 +144,9 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Decrement the htl if the next node is not the closest so far
 		double target = Node.keyToLocation (key);
 		if (Node.distance (target, next.location)
-		> Node.distance (target, closest)) {
+		> Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
-			node.log (this + " has htl " + htl);
-		}
+		node.log (this + " has htl " + htl);
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);

@@ -35,6 +35,6 @@ class Packet
 	
 	public String toString()
 	{
-		return new String (src + ":" + dest + ":" + seq);
+		return new String ("packet " + src + ":" + dest + ":" + seq);
 	}
 }

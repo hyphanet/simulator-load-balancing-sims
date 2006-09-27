@@ -40,7 +40,7 @@ class SskRequestHandler extends RequestHandler
 	
 	private void handleSskDataFound (SskDataFound df)
 	{
-		if (state != ACCEPTED) node.log (df + " out of order");
+		if (searchState != ACCEPTED) node.log (df + " out of order");
 		data = df;
 		if (pubKey == null) return; // Keep waiting
 		if (prev == null) node.log (this + " succeeded");
@@ -55,7 +55,7 @@ class SskRequestHandler extends RequestHandler
 	
 	private void handleSskPubKey (SskPubKey pk)
 	{
-		if (state != ACCEPTED) node.log (pk + " out of order");
+		if (searchState != ACCEPTED) node.log (pk + " out of order");
 		pubKey = pk;
 		if (data == null) return; // Keep waiting
 		if (prev == null) node.log (this + " succeeded");

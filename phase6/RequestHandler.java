@@ -4,8 +4,6 @@ import messages.*;
 
 abstract class RequestHandler extends MessageHandler implements EventTarget
 {
-	protected int state = STARTED; // State of search
-	
 	public RequestHandler (Search s, Node node, Peer prev)
 	{
 		super (s, node, prev);
@@ -13,21 +11,21 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 	
 	protected void handleAccepted (Accepted a)
 	{
-		if (state != SENT) node.log (a + " out of order");
-		state = ACCEPTED;
+		if (searchState != SENT) node.log (a + " out of order");
+		searchState = ACCEPTED;
 		// Wait 60 seconds for a reply to the search
 		Event.schedule (this, 60.0, SEARCH_TIMEOUT, next);
 	}
 	
 	protected void handleRejectedLoop (RejectedLoop rl)
 	{
-		if (state != SENT) node.log (rl + " out of order");
+		if (searchState != SENT) node.log (rl + " out of order");
 		forwardSearch();
 	}
 	
 	protected void handleRouteNotFound (RouteNotFound rnf)
 	{
-		if (state != ACCEPTED) node.log (rnf + " out of order");
+		if (searchState != ACCEPTED) node.log (rnf + " out of order");
 		if (rnf.htl < htl) htl = rnf.htl;
 		// Use the remaining htl to try another peer
 		forwardSearch();
@@ -35,7 +33,7 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 	
 	protected void handleDataNotFound (DataNotFound dnf)
 	{
-		if (state != ACCEPTED) node.log (dnf + " out of order");
+		if (searchState != ACCEPTED) node.log (dnf + " out of order");
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (dnf); // Forward the message
 		finish();
@@ -64,21 +62,20 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 		// Decrement the htl if the next node is not the closest so far
 		double target = Node.keyToLocation (key);
 		if (Node.distance (target, next.location)
-		> Node.distance (target, closest)) {
+		> Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
-			node.log (this + " has htl " + htl);
-		}
+		node.log (this + " has htl " + htl);
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);
-		state = SENT;
+		searchState = SENT;
 		// Wait 5 seconds for the next hop to accept the search
 		Event.schedule (this, 5.0, ACCEPTED_TIMEOUT, next);
 	}
 	
 	protected void finish()
 	{
-		state = COMPLETED;
+		searchState = COMPLETED;
 		node.removeMessageHandler (id);
 	}
 	
@@ -87,7 +84,7 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 	protected void acceptedTimeout (Peer p)
 	{
 		if (p != next) return; // We've already moved on to another peer
-		if (state != SENT) return;
+		if (searchState != SENT) return;
 		node.log (this + " accepted timeout waiting for " + p);
 		forwardSearch(); // Try another peer
 	}
@@ -95,7 +92,7 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 	protected void searchTimeout (Peer p)
 	{
 		if (p != next) return; // We've already moved on to another peer
-		if (state != ACCEPTED) return;
+		if (searchState != ACCEPTED) return;
 		node.log (this + " search timeout waiting for " + p);
 		if (prev == null) node.log (this + " failed");
 		finish();
@@ -103,7 +100,7 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 	
 	protected void transferTimeout (Peer p)
 	{
-		if (state != TRANSFERRING) return;
+		if (searchState != TRANSFERRING) return;
 		node.log (this + " transfer timeout receiving from " + p);
 		if (prev == null) node.log (this + " failed");
 		finish();

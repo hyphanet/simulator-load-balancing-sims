@@ -22,12 +22,19 @@ class Node implements EventTarget
 	private LruCache<Integer> sskStore;
 	private LruCache<Integer> sskCache;
 	private LruCache<Integer> pubKeyCache; // SSK public keys
+	private boolean decrementMaxHtl = false;
+	private boolean decrementMinHtl = false;
 	public TokenBucket bandwidth; // Bandwidth limiter
-	private boolean timerRunning = false; // Is the timer running?
+	private boolean timerRunning = false; // Is the retx timer running?
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
-		location = Math.random();
+		this (Math.random(), txSpeed, rxSpeed);
+	}
+	
+	public Node (double location, double txSpeed, double rxSpeed)
+	{
+		this.location = location;
 		net = new NetworkInterface (this, txSpeed, rxSpeed);
 		peers = new HashMap<Integer,Peer>();
 		recentlySeenRequests = new HashSet<Integer>();
@@ -37,6 +44,8 @@ class Node implements EventTarget
 		sskStore = new LruCache<Integer> (10);
 		sskCache = new LruCache<Integer> (10);
 		pubKeyCache = new LruCache<Integer> (10);
+		if (Math.random() < 0.5) decrementMaxHtl = true;
+		if (Math.random() < 0.25) decrementMinHtl = true;
 		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 	}
 	
@@ -85,8 +94,9 @@ class Node implements EventTarget
 	// Decrement a request or insert's hops to live
 	public int decrementHtl (int htl)
 	{
-		// FIXME: don't always decrement at min/max
-		return htl - 1;
+		if ((htl == Search.MAX_HTL && !decrementMaxHtl)
+		|| (htl == 1 && !decrementMinHtl)) return htl;
+		else return htl - 1;
 	}
 	
 	// Add a CHK to the cache
