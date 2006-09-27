@@ -6,7 +6,7 @@ class SskRequestHandler extends RequestHandler
 {
 	private boolean needPubKey; // Ask the next hop for the public key?
 	private SskPubKey pubKey = null;
-	private SskDataFound data = null;
+	private SskDataFound dataFound = null;
 	
 	public SskRequestHandler (SskRequest r, Node node,
 				Peer prev, boolean needPubKey)
@@ -41,15 +41,15 @@ class SskRequestHandler extends RequestHandler
 	private void handleSskDataFound (SskDataFound df)
 	{
 		if (searchState != ACCEPTED) node.log (df + " out of order");
-		data = df;
+		dataFound = df;
 		if (pubKey == null) return; // Keep waiting
 		if (prev == null) node.log (this + " succeeded");
 		else {
-			prev.sendMessage (data);
+			prev.sendMessage (dataFound);
 			if (needPubKey) prev.sendMessage (pubKey);
 		}
 		node.cachePubKey (key);
-		node.cacheSsk (key);
+		node.cacheSsk (key, dataFound.data);
 		finish();
 	}
 	
@@ -57,14 +57,14 @@ class SskRequestHandler extends RequestHandler
 	{
 		if (searchState != ACCEPTED) node.log (pk + " out of order");
 		pubKey = pk;
-		if (data == null) return; // Keep waiting
+		if (dataFound == null) return; // Keep waiting
 		if (prev == null) node.log (this + " succeeded");
 		else {
-			prev.sendMessage (data);
+			prev.sendMessage (dataFound);
 			if (needPubKey) prev.sendMessage (pubKey);
 		}
 		node.cachePubKey (key);
-		node.cacheSsk (key);
+		node.cacheSsk (key, dataFound.data);
 		finish();
 	}
 	

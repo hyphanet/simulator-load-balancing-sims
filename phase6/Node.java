@@ -19,8 +19,8 @@ class Node implements EventTarget
 	private HashMap<Integer,MessageHandler> messageHandlers; // By ID
 	private LruCache<Integer> chkStore;
 	private LruCache<Integer> chkCache;
-	private LruCache<Integer> sskStore;
-	private LruCache<Integer> sskCache;
+	private LruMap<Integer,Integer> sskStore; // SSKs can collide
+	private LruMap<Integer,Integer> sskCache;
 	private LruCache<Integer> pubKeyCache; // SSK public keys
 	private boolean decrementMaxHtl = false;
 	private boolean decrementMinHtl = false;
@@ -41,8 +41,8 @@ class Node implements EventTarget
 		messageHandlers = new HashMap<Integer,MessageHandler>();
 		chkStore = new LruCache<Integer> (10);
 		chkCache = new LruCache<Integer> (10);
-		sskStore = new LruCache<Integer> (10);
-		sskCache = new LruCache<Integer> (10);
+		sskStore = new LruMap<Integer,Integer> (10);
+		sskCache = new LruMap<Integer,Integer> (10);
 		pubKeyCache = new LruCache<Integer> (10);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
@@ -116,19 +116,27 @@ class Node implements EventTarget
 		else log ("key " + key + " not added to CHK store");
 	}
 	
+	// Retrieve an SSK from the cache or the store
+	public Integer fetchSsk (int key)
+	{
+		Integer data = sskStore.get (key);
+		if (data == null) return sskCache.get (key);
+		else return data;
+	}
+	
 	// Add an SSK to the cache
-	public void cacheSsk (int key)
+	public void cacheSsk (int key, int value)
 	{
 		log ("key " + key + " added to SSK cache");
-		sskCache.put (key);
+		sskCache.put (key, value);
 	}
 	
 	// Consider adding an SSK to the store
-	public void storeSsk (int key)
+	public void storeSsk (int key, int value)
 	{
 		if (closerThanPeers (keyToLocation (key))) {
 			log ("key " + key + " added to SSK store");
-			sskStore.put (key);
+			sskStore.put (key, value);
 		}
 		else log ("key " + key + " not added to SSK store");
 	}
@@ -260,11 +268,12 @@ class Node implements EventTarget
 			prev.sendMessage (new Accepted (r.id));
 		}
 		// If the data is in the store, return it
-		if (pub && sskStore.get (r.key)) {
+		Integer data = sskStore.get (r.key);
+		if (pub && data != null) {
 			log ("key " + r.key + " found in SSK store");
 			if (prev == null) log (r + " succeeded locally");
 			else {
-				prev.sendMessage (new SskDataFound (r.id));
+				prev.sendMessage (new SskDataFound (r.id,data));
 				if (r.needPubKey)
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
@@ -273,11 +282,12 @@ class Node implements EventTarget
 		}
 		log ("key " + r.key + " not found in SSK store");
 		// If the data is in the cache, return it
-		if (pub && sskCache.get (r.key)) {
+		data = sskCache.get (r.key);
+		if (pub && data != null) {
 			log ("key " + r.key + " found in SSK cache");
 			if (prev == null) log (r + " succeeded locally");
 			else {
-				prev.sendMessage (new SskDataFound (r.id));
+				prev.sendMessage (new SskDataFound (r.id,data));
 				if (r.needPubKey)
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
@@ -360,9 +370,9 @@ class Node implements EventTarget
 		handleSskRequest (sr, null);
 	}
 	
-	private void generateSskInsert (int key)
+	private void generateSskInsert (int key, int value)
 	{
-		SskInsert si = new SskInsert (key, location);
+		SskInsert si = new SskInsert (key, value, location);
 		log ("generating " + si);
 		pubKeyCache.put (key);
 		handleSskInsert (si, null);
@@ -403,8 +413,11 @@ class Node implements EventTarget
 			break;
 			
 			case GENERATE_SSK_INSERT:
-			generateSskInsert ((Integer) data);
+			generateSskInsert ((Integer) data, 0);
 			break;
+			
+			case GENERATE_SSK_COLLISION:
+			generateSskInsert ((Integer) data, 1);
 			
 			case CHECK_TIMEOUTS:
 			checkTimeouts();
@@ -417,5 +430,6 @@ class Node implements EventTarget
 	public final static int GENERATE_CHK_INSERT = 2;
 	public final static int GENERATE_SSK_REQUEST = 3;
 	public final static int GENERATE_SSK_INSERT = 4;
-	private final static int CHECK_TIMEOUTS = 5;
+	public final static int GENERATE_SSK_COLLISION = 5;
+	private final static int CHECK_TIMEOUTS = 6;
 }

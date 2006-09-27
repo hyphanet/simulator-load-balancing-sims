@@ -65,10 +65,8 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 		blocksReceived++;
 		// Forward the block to all receivers
 		for (Peer p : receivers) p.sendMessage (b);
-		// If the transfer is complete, cache and maybe store the data
+		// If the transfer is complete, consider finishing
 		if (blocksReceived == 32) {
-			node.cacheChk (key);
-			node.storeChk (key);
 			inState = COMPLETED;
 			considerFinishing();
 		}
@@ -167,6 +165,8 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		inState = COMPLETED;
 		searchState = COMPLETED;
+		node.cacheChk (key);
+		node.storeChk (key);
 		if (prev == null) node.log (this + " completed");
 		else prev.sendMessage (new TransfersCompleted (id));
 		node.removeMessageHandler (id);

@@ -7,18 +7,33 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 {
 	private int searchState = STARTED; // searchState of search
 	private SskPubKey pubKey = null; 
+	private int data; // The data being inserted
 	
 	public SskInsertHandler (SskInsert i, Node node,
 				Peer prev, boolean needPubKey)
 	{
 		super (i, node, prev);
+		data = i.data;
 		// Wait 10 seconds for the previous hop to send the public key
 		if (needPubKey) Event.schedule (this, 10.0, KEY_TIMEOUT, null);
 		else {
 			pubKey = new SskPubKey (id, key);
-			node.cacheSsk (key);
-			node.storeSsk (key);
+			checkCollision();
 			forwardSearch();
+		}
+	}
+	
+	// Check whether an older version of the data is already stored
+	private void checkCollision()
+	{
+		Integer old = node.fetchSsk (key);
+		if (old != null && old != data) {
+			node.log (this + " collided");
+			if (prev == null) node.log (this + " collided locally");
+			else prev.sendMessage (new SskDataFound (id, old));
+			// Continue inserting the old data
+			data = old;
+			return;
 		}
 	}
 	
@@ -36,6 +51,8 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 				handleRejectedLoop ((RejectedLoop) m);
 			else if (m instanceof RouteNotFound)
 				handleRouteNotFound ((RouteNotFound) m);
+			else if (m instanceof SskDataFound)
+				handleCollision ((SskDataFound) m);
 			else if (m instanceof InsertReply)
 				handleInsertReply ((InsertReply) m);
 			else node.log ("unexpected type for " + m);
@@ -47,9 +64,7 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (searchState != STARTED) node.log (pk + " out of order");
 		pubKey = pk;
-		node.cachePubKey (key);
-		node.cacheSsk (key);
-		node.storeSsk (key);
+		checkCollision();
 		forwardSearch();
 	}
 	
@@ -75,6 +90,14 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 		if (rnf.htl < htl) htl = rnf.htl;
 		// Use the remaining htl to try another peer
 		forwardSearch();
+	}
+	
+	private void handleCollision (SskDataFound sdf)
+	{
+		if (searchState != ACCEPTED) node.log (sdf + " out of order");
+		if (prev == null) node.log (this + " collided");
+		else prev.sendMessage (sdf); // Forward the message
+		data = sdf.data; // Is this safe?
 	}
 	
 	private void handleInsertReply (InsertReply ir)
@@ -122,17 +145,20 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	private void finish()
 	{
 		searchState = COMPLETED;
+		node.cachePubKey (key);
+		node.cacheSsk (key, data);
+		node.storeSsk (key, data);
 		node.removeMessageHandler (id);
 	}
 	
 	protected Search makeSearchMessage()
 	{
-		return new SskInsert (id, key, closest, htl);
+		return new SskInsert (id, key, data, closest, htl);
 	}
 	
 	public String toString()
 	{
-		return new String ("SSK insert (" + id + "," + key + ")");
+		return new String ("SSK insert (" +id+ "," +key+ "," +data+")");
 	}
 	
 	// Event callbacks

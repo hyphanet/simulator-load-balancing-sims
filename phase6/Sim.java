@@ -22,11 +22,14 @@ class Sim
 		}
 		
 		int key = Node.locationToKey (Math.random());
-		Event.schedule (nodes[0], 0.0, Node.GENERATE_SSK_INSERT, key);
-		Event.schedule (nodes[10], 30.0, Node.GENERATE_SSK_REQUEST,key);
-		key = Node.locationToKey (Math.random());
-		Event.schedule (nodes[5], 60.0, Node.GENERATE_CHK_INSERT, key);
-		Event.schedule (nodes[15], 90.0, Node.GENERATE_CHK_REQUEST,key);
+		Event.schedule (nodes[0], 0.0,
+			Node.GENERATE_SSK_INSERT, key);
+		Event.schedule (nodes[5], 30.0,
+			Node.GENERATE_SSK_REQUEST, key);
+		Event.schedule (nodes[10], 60.0,
+			Node.GENERATE_SSK_COLLISION, key);
+		Event.schedule (nodes[15], 90.0,
+			Node.GENERATE_SSK_REQUEST, key);
 		
 		// Run the simulation
 		Event.run();

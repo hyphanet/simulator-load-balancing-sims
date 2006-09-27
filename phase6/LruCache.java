@@ -4,8 +4,8 @@ import java.util.LinkedHashSet;
 
 class LruCache<Key>
 {
-	public int capacity;
-	public LinkedHashSet<Key> set;
+	public final int capacity;
+	private LinkedHashSet<Key> set;
 	
 	public LruCache (int capacity)
 	{
