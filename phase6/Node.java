@@ -49,16 +49,21 @@ class Node implements EventTarget
 		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 	}
 	
-	public void connect (Node n, double latency)
+	// Return true if a connection was added, false if already connected
+	public boolean connect (Node n, double latency)
 	{
+		if (n == this) return false;
+		if (peers.containsKey (n.net.address)) return false;
+		log ("adding peer " + n.net.address);
 		Peer p = new Peer (this, n.net.address, n.location, latency);
 		peers.put (n.net.address, p);
+		return true;
 	}
 	
-	public void connectBothWays (Node n, double latency)
+	public boolean connectBothWays (Node n, double latency)
 	{
-		connect (n, latency);
-		n.connect (this, latency);
+		if (connect (n, latency)) return n.connect (this, latency);
+		else return false;
 	}
 	
 	// Calculate the circular distance between two locations
@@ -226,6 +231,7 @@ class Node implements EventTarget
 		// Store the request handler and forward the search
 		ChkRequestHandler rh = new ChkRequestHandler (r, this, prev);
 		messageHandlers.put (r.id, rh);
+		rh.start();
 	}
 	
 	private void handleChkInsert (ChkInsert i, Peer prev)
@@ -246,6 +252,7 @@ class Node implements EventTarget
 		// Store the insert handler and wait for a DataInsert
 		ChkInsertHandler ih = new ChkInsertHandler (i, this, prev);
 		messageHandlers.put (i.id, ih);
+		ih.start();
 	}
 	
 	private void handleSskRequest (SskRequest r, Peer prev)
@@ -298,6 +305,7 @@ class Node implements EventTarget
 		// Store the request handler and forward the search
 		SskRequestHandler rh = new SskRequestHandler (r,this,prev,!pub);
 		messageHandlers.put (r.id, rh);
+		rh.start();
 	}
 	
 	private void handleSskInsert (SskInsert i, Peer prev)
@@ -322,6 +330,7 @@ class Node implements EventTarget
 		// Store the insert handler and possibly wait for the pub key
 		SskInsertHandler ih = new SskInsertHandler (i,this,prev,!pub);
 		messageHandlers.put (i.id, ih);
+		ih.start();
 	}
 	
 	public void removeMessageHandler (int id)

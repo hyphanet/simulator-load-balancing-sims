@@ -11,7 +11,6 @@ class ChkRequestHandler extends RequestHandler
 	{
 		super (r, node, prev);
 		received = new boolean[32];
-		forwardSearch();
 	}
 	
 	public void handleMessage (Message m, Peer src)

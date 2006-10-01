@@ -9,6 +9,11 @@ abstract class RequestHandler extends MessageHandler implements EventTarget
 		super (s, node, prev);
 	}
 	
+	public void start()
+	{
+		forwardSearch();
+	}
+	
 	protected void handleAccepted (Accepted a)
 	{
 		if (searchState != SENT) node.log (a + " out of order");

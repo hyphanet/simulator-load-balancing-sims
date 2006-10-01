@@ -14,10 +14,16 @@ class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		super (i, node, prev);
 		data = i.data;
-		// Wait 10 seconds for the previous hop to send the public key
-		if (needPubKey) Event.schedule (this, 10.0, KEY_TIMEOUT, null);
+		if (!needPubKey) pubKey = new SskPubKey (id, key);
+	}
+	
+	public void start()
+	{
+		if (pubKey == null) {
+			// Wait 10 seconds for the previous hop to send the key
+			Event.schedule (this, 10.0, KEY_TIMEOUT, null);
+		}
 		else {
-			pubKey = new SskPubKey (id, key);
 			checkCollision();
 			forwardSearch();
 		}

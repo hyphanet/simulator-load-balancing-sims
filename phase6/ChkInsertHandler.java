@@ -17,6 +17,12 @@ class ChkInsertHandler extends MessageHandler implements EventTarget
 		blocks = new Block[32];
 	}
 	
+	public void start()
+	{
+		// Wait 10 seconds for the incoming transfer to start
+		Event.schedule (this, 10.0, DATA_TIMEOUT, null);
+	}
+	
 	public void handleMessage (Message m, Peer src)
 	{
 		if (src == prev) {

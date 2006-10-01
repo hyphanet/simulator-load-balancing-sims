@@ -14,7 +14,6 @@ class SskRequestHandler extends RequestHandler
 		super (r, node, prev);
 		this.needPubKey = needPubKey;
 		if (!needPubKey) pubKey = new SskPubKey (id, key);
-		forwardSearch();
 	}
 	
 	public void handleMessage (Message m, Peer src)
