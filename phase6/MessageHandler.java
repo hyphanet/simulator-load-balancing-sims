@@ -38,7 +38,7 @@ abstract class MessageHandler
 		double target = Node.keyToLocation (key);
 		if (Node.distance (target, node.location)
 		< Node.distance (target, closest)) {
-			node.log ("resetting htl of " + this);
+			node.log ("resetting htl of " + this); // FIXME
 			closest = node.location;
 			htl = Search.MAX_HTL;
 		}
