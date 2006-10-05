@@ -41,7 +41,8 @@ class Sim
 	
 	private void makeKleinbergNetwork()
 	{
-		// Add exactly DEGREE/2 outgoing edges to each node
+		// Add DEGREE/2 outgoing edges to each node, with replacement
+		double outDegree = DEGREE * 0.5;
 		for (int i = 0; i < NODES; i++) {
 			// Calculate the normalising constant
 			double c = 0.0;
@@ -50,13 +51,13 @@ class Sim
 				c += 1.0 / latticeDistance (i, j);
 			}
 			// Add the outgoing edges
-			int deg = 0;
-			for (int j = 0; deg < DEGREE/2; j = (j+1) % NODES) {
+			for (int j = 0; j < NODES; j++) {
 				if (i == j) continue;
-				double prob = 1.0 / latticeDistance (i, j) / c;
+				int dist = latticeDistance (i, j);
+				double prob = outDegree / dist / c;
 				if (Math.random() < prob)
-					if (nodes[i].connectBothWays
-					(nodes[j], LATENCY)) deg++;
+					nodes[i].connectBothWays
+						(nodes[j], LATENCY);
 			}
 		}
 	}
