@@ -47,10 +47,12 @@ class Sim
 			norm += 1.0 / latticeDistance (0, i);
 		
 		// Add DEGREE shortcuts per node, randomly with replacement
+		double outDegree = DEGREE * 0.5;
 		for (int i = 0; i < NODES; i++) {
-			for (int j = 0; j < i; j++) {
+			for (int j = 0; j < NODES; j++) {
+				if (i == j) continue;
 				double p = 1.0 / latticeDistance (i, j) / norm;
-				for (int k = 0; k < DEGREE; k++) {
+				for (int k = 0; k < outDegree; k++) {
 					if (Math.random() < p) {
 						nodes[i].connectBothWays
 							(nodes[j], LATENCY);
