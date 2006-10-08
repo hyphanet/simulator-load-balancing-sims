@@ -16,7 +16,7 @@ If same id is in progress, send RejectedLoop and return
 If this is the closest node so far, update closest location and reset htl
 Send Accepted
 If data is in store or cache:
-  If key is an SSK, send DataFound and SSKPubKey if requested, return
+  If key is an SSK, send SSKDataFound and SSKPubKey if requested, return
   If key is a CHK, start a new BlockTransmitter and return
 If there's a transferring RequestSender with the same key, coalesce
 Otherwise if htl==0, send DataNotFound and return
@@ -134,7 +134,7 @@ Wait 5 seconds for Accepted, RejectedLoop or RejectedOverload
 Wait 60 seconds for DataNotFound, RouteNotFound, RejectedOverload, SSKPubKey, CHKDataFound or SSKDataFound
   If peer disconnects, try another peer
   If wait times out, back off and return TIMED_OUT
-  If DataNotFound, return data not found
+  If DataNotFound, return DATA_NOT_FOUND
   If RouteNotFound, let htl=min(htl,newHtl) and try another peer
   If local RejectedOverload, back off and try another peer
   If non-local RejectedOverload, forward it
