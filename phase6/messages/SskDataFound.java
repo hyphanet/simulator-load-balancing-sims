@@ -8,7 +8,11 @@ public class SskDataFound extends Message
 	{
 		this.id = id;
 		this.data = data;
-		size = Message.HEADER_SIZE + Message.DATA_SIZE;
+	}
+	
+	public int size()
+	{
+		return HEADER_SIZE + DATA_SIZE;
 	}
 	
 	public String toString()

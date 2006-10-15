@@ -8,7 +8,6 @@ public class RouteNotFound extends Message
 	{
 		this.id = id;
 		this.htl = htl;
-		size = Message.HEADER_SIZE;
 	}
 	
 	public String toString()

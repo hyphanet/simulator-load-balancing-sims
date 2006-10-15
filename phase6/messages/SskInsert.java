@@ -9,7 +9,6 @@ public class SskInsert extends Search
 	{
 		super (key, location);
 		this.data = data;
-		size += DATA_SIZE;
 	}
 	
 	// Forward an insert
@@ -17,7 +16,11 @@ public class SskInsert extends Search
 	{
 		super (id, key, closest, htl);
 		this.data = data;
-		size += DATA_SIZE;
+	}
+	
+	public int size()
+	{
+		return HEADER_SIZE + KEY_SIZE + DATA_SIZE;
 	}
 	
 	public String toString()

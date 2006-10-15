@@ -3,15 +3,15 @@
 import java.util.LinkedList;
 import messages.Message;
 
-class DeadlineQueue
+class DeadlineQueue<MESSAGE extends Message>
 {
 	public int size = 0; // Size in bytes
-	private LinkedList<Message> messages = new LinkedList<Message>();
+	private LinkedList<MESSAGE> messages = new LinkedList<MESSAGE>();
 	private LinkedList<Double> deadlines = new LinkedList<Double>();
 	
-	public void add (Message m, double deadline)
+	public void add (MESSAGE m, double deadline)
 	{
-		size += m.size;
+		size += m.size();
 		messages.add (m);
 		deadlines.add (deadline);
 	}
@@ -19,7 +19,7 @@ class DeadlineQueue
 	public int headSize()
 	{
 		if (messages.isEmpty()) return 0;
-		else return messages.peek().size;
+		else return messages.peek().size();
 	}
 	
 	public double deadline()
@@ -29,11 +29,11 @@ class DeadlineQueue
 		else return deadline;
 	}
 	
-	public Message pop()
+	public MESSAGE pop()
 	{
 		deadlines.poll();
-		Message m = messages.poll();
-		if (m != null) size -= m.size;
+		MESSAGE m = messages.poll();
+		if (m != null) size -= m.size();
 		return m;
 	}
 }

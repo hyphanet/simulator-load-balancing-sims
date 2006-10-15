@@ -15,7 +15,6 @@ public class Search extends Message
 		this.key = key;
 		closest = location;
 		htl = MAX_HTL;
-		size = Message.HEADER_SIZE + Message.KEY_SIZE;
 	}
 	
 	// Forward a search
@@ -25,7 +24,11 @@ public class Search extends Message
 		this.key = key;
 		this.closest = closest;
 		this.htl = htl;
-		size = Message.HEADER_SIZE + Message.KEY_SIZE;
+	}
+	
+	public int size()
+	{
+		return HEADER_SIZE + KEY_SIZE;
 	}
 	
 	public String toString()

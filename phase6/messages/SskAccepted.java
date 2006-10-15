@@ -8,7 +8,6 @@ public class SskAccepted extends Message
 	{
 		this.id = id;
 		this.needPubKey = needPubKey;
-		size = Message.HEADER_SIZE;
 	}
 	
 	public String toString()

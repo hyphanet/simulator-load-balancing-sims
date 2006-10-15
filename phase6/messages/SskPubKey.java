@@ -8,7 +8,11 @@ public class SskPubKey extends Message
 	{
 		this.id = id;
 		this.key = key;
-		size = Message.HEADER_SIZE + Message.PUB_KEY_SIZE;
+	}
+	
+	public int size()
+	{
+		return HEADER_SIZE + PUB_KEY_SIZE;
 	}
 	
 	public String toString()
