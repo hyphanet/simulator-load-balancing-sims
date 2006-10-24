@@ -145,8 +145,8 @@ class Peer
 	// Called by Node when a packet arrives
 	public void handlePacket (Packet p)
 	{
-		if (p.messages != null) handleData (p);
 		if (p.acks != null) for (Ack a : p.acks) handleAck (a);
+		if (p.messages != null) handleData (p);
 	}
 	
 	private void handleData (Packet p)
