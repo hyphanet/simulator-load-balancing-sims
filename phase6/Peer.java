@@ -1,9 +1,7 @@
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.HashSet;
-import messages.Message;
-import messages.Block;
-import messages.Ack;
+import messages.*;
 
 class Peer
 {
@@ -31,7 +29,7 @@ class Peer
 	private LinkedList<Packet> txBuffer; // Retransmission buffer
 	private DeadlineQueue<Ack> ackQueue; // Outgoing acks
 	private DeadlineQueue<Message> searchQueue; // Outgoing search messages
-	private DeadlineQueue<Block> transferQueue; // Outgoing transfers
+	private DeadlineQueue<Message> transferQueue; // Outgoing transfers
 	private CongestionWindow window; // AIMD congestion window
 	private double lastTransmission = 0.0; // Clock time
 	private boolean tgif = false; // "Transfers go in first" toggle
@@ -49,7 +47,7 @@ class Peer
 		txBuffer = new LinkedList<Packet>();
 		ackQueue = new DeadlineQueue<Ack>();
 		searchQueue = new DeadlineQueue<Message>();
-		transferQueue = new DeadlineQueue<Block>();
+		transferQueue = new DeadlineQueue<Message>();
 		window = new CongestionWindow (this);
 		rxDupe = new HashSet<Integer>();
 	}
@@ -57,9 +55,10 @@ class Peer
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
-		if (m instanceof Block) {
+		if (m instanceof Block || m instanceof DataInsert
+		|| m instanceof ChkDataFound) {
 			log (m + " added to transfer queue");
-			transferQueue.add ((Block) m, Event.time() + MAX_DELAY);
+			transferQueue.add (m, Event.time() + MAX_DELAY);
 		}
 		else {
 			log (m + " added to search queue");

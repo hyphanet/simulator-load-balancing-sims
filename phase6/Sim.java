@@ -20,13 +20,13 @@ class Sim
 		
 		int key = Node.locationToKey (Math.random());
 		Event.schedule (nodes[0], 0.0,
-			Node.GENERATE_SSK_INSERT, key);
+			Node.GENERATE_CHK_INSERT, key);
 		Event.schedule (nodes[NODES/4], 30.0,
-			Node.GENERATE_SSK_REQUEST, key);
+			Node.GENERATE_CHK_REQUEST, key);
 		Event.schedule (nodes[NODES/2], 60.0,
-			Node.GENERATE_SSK_COLLISION, key);
+			Node.GENERATE_CHK_INSERT, key);
 		Event.schedule (nodes[3*NODES/4], 90.0,
-			Node.GENERATE_SSK_REQUEST, key);
+			Node.GENERATE_CHK_REQUEST, key);
 		
 		// Run the simulation
 		Event.run();
