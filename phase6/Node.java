@@ -6,6 +6,12 @@ import messages.*;
 
 class Node implements EventTarget
 {
+	public final static double SHORT_SLEEP = 0.01; // Poll the bw limiter
+	
+	// Token bucket bandwidth limiter
+	public final static int BUCKET_RATE = 30000; // Bytes per second
+	public final static int BUCKET_SIZE = 60000; // Burst size in bytes
+	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
@@ -18,6 +24,7 @@ class Node implements EventTarget
 	private LruCache<Integer> pubKeyCache; // SSK public keys
 	private boolean decrementMaxHtl = false;
 	private boolean decrementMinHtl = false;
+	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false; // Is the retx timer running?
 	
 	public Node (double txSpeed, double rxSpeed)
@@ -39,6 +46,7 @@ class Node implements EventTarget
 		pubKeyCache = new LruCache<Integer> (10);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
+		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -390,7 +398,8 @@ class Node implements EventTarget
 			timerRunning = false;
 		}
 		else {
-			double sleep = Math.max (deadline - Event.time(), 0.0);
+			double sleep = deadline - Event.time(); // Can be < 0
+			if (sleep < SHORT_SLEEP) sleep = SHORT_SLEEP;
 			// log ("sleeping for " + sleep + " seconds");
 			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);
 		}
