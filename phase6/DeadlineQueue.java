@@ -24,9 +24,8 @@ class DeadlineQueue<MESSAGE extends Message>
 	
 	public double deadline()
 	{
-		Double deadline = deadlines.peek();
-		if (deadline == null) return Double.POSITIVE_INFINITY;
-		else return deadline;
+		if (deadlines.isEmpty()) return Double.POSITIVE_INFINITY;
+		else return deadlines.peek();
 	}
 	
 	public MESSAGE pop()

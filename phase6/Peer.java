@@ -83,14 +83,16 @@ class Peer
 	
 	// Try to send a packet, return true if a packet was sent
 	private boolean send()
-	{		
-		if (ackQueue.size + searchQueue.size + transferQueue.size == 0){
+	{
+		int waiting = ackQueue.size + searchQueue.size
+				+ transferQueue.size;
+		if (waiting == 0) {
 			log ("nothing to send");
 			return false;
 		}
-		log (ackQueue.size + " bytes of acks in queue");
-		log (searchQueue.size + " bytes of searches in queue");
-		log (transferQueue.size + " bytes of transfers in queue");
+		log (ackQueue.size + " bytes in ack queue");
+		log (searchQueue.size + " bytes in search queue");
+		log (transferQueue.size + " bytes in transfer queue");
 		
 		// Return to slow start when the link is idle
 		double now = Event.time();
@@ -98,9 +100,8 @@ class Peer
 		lastTransmission = now;
 		
 		// Delay small packets for coalescing
-		if (now < deadline (now)) {
-			int payload = searchQueue.size + transferQueue.size;
-			log ("delaying transmission of " + payload + " bytes");
+		if (now < deadline()) {
+			log ("delaying transmission of " + waiting + " bytes");
 			return false;
 		}
 		
@@ -119,8 +120,6 @@ class Peer
 			log ("waiting for ack " + (txMaxSeq - SEQ_RANGE + 1));
 		else if (window.available() <= 0)
 			log ("no room in congestion window for messages");
-		else if (node.bandwidth.available() <= 0)
-			log ("no bandwidth available for messages");
 		else pack (p); // OK to send data
 		
 		// Don't send empty packets
@@ -137,7 +136,6 @@ class Peer
 		// Send the packet
 		log ("sending packet " + p.seq + ", " + p.size + " bytes");
 		node.net.send (p, address, latency);
-		node.bandwidth.remove (p.size);
 		return true;
 	}
 	
@@ -250,13 +248,13 @@ class Peer
 	// Called by Node, returns the next coalescing or retx deadline
 	public double checkTimeouts()
 	{
-		log ("checking timeouts");
 		// Send as many packets as possible
 		while (send());
 		
-		log (txBuffer.size() + " packets in flight");
+		log ("checking timeouts");
 		double now = Event.time();
-		if (txBuffer.isEmpty()) return deadline (now);
+		if (txBuffer.isEmpty()) return deadline();
+		log (txBuffer.size() + " packets in flight");
 		
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt + MAX_DELAY) {
@@ -269,40 +267,34 @@ class Peer
 		}
 		
 		// Sleep for up to MAX_DELAY seconds until the next deadline
-		return Math.min (now + MAX_DELAY, deadline (now));
+		return Math.min (now + MAX_DELAY, deadline());
 	}
 	
 	// Work out when the first ack or search or transfer needs to be sent
-	private double deadline (double now)
+	private double deadline()
 	{
-		return Math.min (ackQueue.deadline(), dataDeadline (now));
+		return Math.min (ackQueue.deadline(), dataDeadline());
 	}
 	
 	// Work out when the first search or transfer needs to be sent
-	private double dataDeadline (double now)
+	private double dataDeadline()
 	{
-		// If there's no data waiting, use the ack deadline
-		if (searchQueue.size + transferQueue.size == 0)
-			return Double.POSITIVE_INFINITY;
+		int waiting = searchQueue.size + transferQueue.size;
 		
-		double deadline = Math.min (searchQueue.deadline(),
-						transferQueue.deadline());
+		// If there's no data waiting, use the ack deadline
+		if (waiting == 0) return Double.POSITIVE_INFINITY;
 		
 		// Delay small packets until the coalescing deadline
-		if (searchQueue.size + transferQueue.size
-		< Packet.SENSIBLE_PAYLOAD)
-			return deadline;
+		if (waiting < Packet.SENSIBLE_PAYLOAD)
+			return Math.min (searchQueue.deadline(),
+					transferQueue.deadline());
 		
 		// If there's not enough room in the window, wait for an ack
-		if (window.available() <= 0)
+		if (window.available() < Packet.SENSIBLE_PAYLOAD)
 			return Double.POSITIVE_INFINITY;
 		
-		// If there's not enough bandwidth, try again shortly
-		if (node.bandwidth.available() <= 0)
-			return Math.max (deadline, now + Node.SHORT_SLEEP);
-		
 		// Send a packet immediately
-		return now;
+		return 0.0;
 	}
 	
 	public void log (String message)
