@@ -55,14 +55,15 @@ class Peer
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
+		m.deadline = Event.time() + MAX_DELAY; // FIXME
 		if (m instanceof Block || m instanceof DataInsert
 		|| m instanceof ChkDataFound) {
 			log (m + " added to transfer queue");
-			transferQueue.add (m, Event.time() + MAX_DELAY);
+			transferQueue.add (m);
 		}
 		else {
 			log (m + " added to search queue");
-			searchQueue.add (m, Event.time() + MAX_DELAY);
+			searchQueue.add (m);
 		}
 		// Start the node's timer if necessary
 		node.startTimer();
@@ -74,7 +75,7 @@ class Peer
 	private void sendAck (int seq)
 	{
 		log ("ack " + seq + " added to ack queue");
-		ackQueue.add (new Ack (seq), Event.time() + MAX_DELAY);
+		ackQueue.add (new Ack (seq, Event.time() + MAX_DELAY));
 		// Start the node's timer if necessary
 		node.startTimer();
 		// Send as many packets as possible

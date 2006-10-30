@@ -13,6 +13,7 @@ public class Message
 	public static int nextId = 0; // Each request and insert has a unique ID
 	
 	public int id; // Unique request ID
+	public double deadline = 0.0; // Coalescing, stored here for convenience
 	
 	// Override this
 	public int size()

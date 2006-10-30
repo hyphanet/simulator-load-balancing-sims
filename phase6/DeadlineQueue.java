@@ -7,13 +7,11 @@ class DeadlineQueue<MESSAGE extends Message>
 {
 	public int size = 0; // Size in bytes
 	private LinkedList<MESSAGE> messages = new LinkedList<MESSAGE>();
-	private LinkedList<Double> deadlines = new LinkedList<Double>();
 	
-	public void add (MESSAGE m, double deadline)
+	public void add (MESSAGE m)
 	{
 		size += m.size();
 		messages.add (m);
-		deadlines.add (deadline);
 	}
 	
 	public int headSize()
@@ -24,13 +22,12 @@ class DeadlineQueue<MESSAGE extends Message>
 	
 	public double deadline()
 	{
-		if (deadlines.isEmpty()) return Double.POSITIVE_INFINITY;
-		else return deadlines.peek();
+		if (messages.isEmpty()) return Double.POSITIVE_INFINITY;
+		else return messages.peek().deadline;
 	}
 	
 	public MESSAGE pop()
 	{
-		deadlines.poll();
 		MESSAGE m = messages.poll();
 		if (m != null) size -= m.size();
 		return m;
