@@ -8,6 +8,7 @@ class Sim
 	private final double SPEED = 20000; // Bytes per second
 	private final double LATENCY = 0.1; // Latency of all links in seconds
 	private final double RATE = 0.01; // Inserts per second
+	private final int INSERTS = 50;
 	private Node[] nodes;
 	
 	public Sim()
@@ -23,7 +24,8 @@ class Sim
 		makeKleinbergNetwork();
 		
 		// One publisher, ten randomly chosen readers
-		SimplePublisher pub = new SimplePublisher (RATE, nodes[0]);
+		SimplePublisher pub
+			= new SimplePublisher (RATE, INSERTS, nodes[0]);
 		int readers = 0;
 		while (readers < 10) {
 			int index = (int) (Math.random() * NODES);
@@ -31,7 +33,6 @@ class Sim
 		}
 		
 		// Run the simulation
-		Event.duration = 3600.0;
 		Event.run();
 	}
 	

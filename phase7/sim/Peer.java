@@ -257,9 +257,9 @@ public class Peer
 		// Send as many packets as possible
 		while (send());
 		
-		log (txBuffer.size() + " packets in flight");
 		double now = Event.time();
 		if (txBuffer.isEmpty()) return deadline (now);
+		log (txBuffer.size() + " packets in flight");
 		
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt + MAX_DELAY) {

@@ -8,10 +8,6 @@ import java.util.Collections;
 
 public class Node implements EventTarget
 {
-	// Token bucket bandwidth limiter
-	public final static int BUCKET_RATE = 30000; // Bytes per second
-	public final static int BUCKET_SIZE = 60000; // Burst size in bytes
-	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
@@ -39,14 +35,14 @@ public class Node implements EventTarget
 		peers = new HashMap<Integer,Peer>();
 		recentlySeenRequests = new HashSet<Integer>();
 		messageHandlers = new HashMap<Integer,MessageHandler>();
-		chkStore = new LruCache<Integer> (10);
-		chkCache = new LruCache<Integer> (10);
-		sskStore = new LruMap<Integer,Integer> (10);
-		sskCache = new LruMap<Integer,Integer> (10);
-		pubKeyCache = new LruCache<Integer> (10);
+		chkStore = new LruCache<Integer> (1000);
+		chkCache = new LruCache<Integer> (1000);
+		sskStore = new LruMap<Integer,Integer> (1000);
+		sskCache = new LruMap<Integer,Integer> (1000);
+		pubKeyCache = new LruCache<Integer> (1000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
-		bandwidth = new TokenBucket (BUCKET_RATE, BUCKET_SIZE);
+		bandwidth = new TokenBucket (30000, 60000);
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -398,7 +394,8 @@ public class Node implements EventTarget
 			timerRunning = false;
 		}
 		else {
-			double sleep = Math.max (deadline - Event.time(), 0.0);
+			double sleep = deadline - Event.time();
+			if (sleep < Peer.MIN_SLEEP) sleep = Peer.MIN_SLEEP;
 			// log ("sleeping for " + sleep + " seconds");
 			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);
 		}

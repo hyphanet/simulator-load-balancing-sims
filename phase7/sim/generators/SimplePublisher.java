@@ -10,12 +10,14 @@ import java.util.HashSet;
 public class SimplePublisher implements EventTarget
 {
 	public final double rate; // Inserts per second
+	private int inserts; // Publish this many inserts (0 for unlimited)
 	private Node node; // The publisher's node
 	private HashSet<Node> readers; // The readers' nodes
 	
-	public SimplePublisher (double rate, Node node)
+	public SimplePublisher (double rate, int inserts, Node node)
 	{
 		this.rate = rate;
+		this.inserts = inserts;
 		this.node = node;
 		readers = new HashSet<Node>();
 		// Schedule the first insert
@@ -37,10 +39,11 @@ public class SimplePublisher implements EventTarget
 		Event.schedule (node, 0.0, Node.INSERT_CHK, key);
 		// Inform each reader after an average of ten minutes
 		for (Node n : readers) {
-			double delay = -Math.log (Math.random()) * 600.0;
+			double delay = 595.0 + Math.random() * 10.0;
 			Event.schedule (n, delay, Node.REQUEST_CHK, key);
 		}
-		// Schedule the next insert
+		// Schedule the next insert after an exp. distributed delay
+		if (inserts > 0 && --inserts == 0) return;
 		double delay = -Math.log (Math.random()) / rate;
 		Event.schedule (this, delay, PUBLISH, null);
 	}
