@@ -1,8 +1,8 @@
 // A queue storing outgoing messages and their coalescing deadlines
 
 package sim;
-import java.util.LinkedList;
 import sim.messages.Message;
+import java.util.LinkedList;
 
 class DeadlineQueue<MESSAGE extends Message>
 {

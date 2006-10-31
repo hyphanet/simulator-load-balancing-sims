@@ -1,6 +1,6 @@
 package sim;
 
-interface EventTarget
+public interface EventTarget
 {
 	public void handleEvent (int type, Object data);
 }

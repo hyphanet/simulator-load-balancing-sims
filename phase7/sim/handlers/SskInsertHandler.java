@@ -1,8 +1,9 @@
 // The state of an SSK insert as stored at each node along the path
 
 package sim.handlers;
-import java.util.HashSet;
+import sim.*;
 import sim.messages.*;
+import java.util.HashSet;
 
 public class SskInsertHandler extends MessageHandler implements EventTarget
 {

@@ -1,7 +1,7 @@
 package sim;
 import java.util.TreeSet; // Gotta love the collections framework...
 
-class Event implements Comparable
+public class Event implements Comparable
 {
 	// Static variables and methods for the event queue
 	

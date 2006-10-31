@@ -1,12 +1,12 @@
 package sim;
+import sim.handlers.*;
+import sim.messages.*;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collections;
-import sim.handlers.*;
-import sim.messages.*;
 
-class Node implements EventTarget
+public class Node implements EventTarget
 {
 	// Token bucket bandwidth limiter
 	public final static int BUCKET_RATE = 30000; // Bytes per second

@@ -1,9 +1,11 @@
 // The state of a search as stored at each node along the path
 
 package sim.handlers;
-import java.util.LinkedList;
+import sim.Node;
+import sim.Peer;
 import sim.messages.Search;
 import sim.messages.Message;
+import java.util.LinkedList;
 
 public abstract class MessageHandler
 {

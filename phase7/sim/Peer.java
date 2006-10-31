@@ -1,10 +1,10 @@
 package sim;
+import sim.messages.*;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.HashSet;
-import sim.messages.*;
 
-class Peer
+public class Peer
 {
 	private Node node; // The local node
 	public int address; // The remote node's address

@@ -1,6 +1,7 @@
 // The state of an SSK request as stored at each node along the path
 
 package sim.handlers;
+import sim.*;
 import sim.messages.*;
 
 public class SskRequestHandler extends RequestHandler

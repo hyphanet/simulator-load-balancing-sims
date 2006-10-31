@@ -1,6 +1,7 @@
 // The parent class of ChkRequestHandler and SskRequestHandler
 
 package sim.handlers;
+import sim.*;
 import sim.messages.*;
 
 public abstract class RequestHandler extends MessageHandler

@@ -1,8 +1,9 @@
 // The state of a CHK insert as stored at each node along the path
 
 package sim.handlers;
-import java.util.HashSet;
+import sim.*;
 import sim.messages.*;
+import java.util.HashSet;
 
 public class ChkInsertHandler extends MessageHandler implements EventTarget
 {

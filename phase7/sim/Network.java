@@ -1,3 +1,4 @@
+package sim;
 import java.util.HashMap;
 
 class Network
