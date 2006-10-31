@@ -408,23 +408,23 @@ public class Node implements EventTarget
 	public void handleEvent (int type, Object data)
 	{
 		switch (type) {
-			case GENERATE_CHK_REQUEST:
+			case REQUEST_CHK:
 			generateChkRequest ((Integer) data);
 			break;
 			
-			case GENERATE_CHK_INSERT:
+			case INSERT_CHK:
 			generateChkInsert ((Integer) data);
 			break;
 			
-			case GENERATE_SSK_REQUEST:
+			case REQUEST_SSK:
 			generateSskRequest ((Integer) data);
 			break;
 			
-			case GENERATE_SSK_INSERT:
+			case INSERT_SSK:
 			generateSskInsert ((Integer) data, 0);
 			break;
 			
-			case GENERATE_SSK_COLLISION:
+			case SSK_COLLISION:
 			generateSskInsert ((Integer) data, 1);
 			
 			case CHECK_TIMEOUTS:
@@ -434,10 +434,10 @@ public class Node implements EventTarget
 	}
 	
 	// Each EventTarget class has its own event codes
-	public final static int GENERATE_CHK_REQUEST = 1;
-	public final static int GENERATE_CHK_INSERT = 2;
-	public final static int GENERATE_SSK_REQUEST = 3;
-	public final static int GENERATE_SSK_INSERT = 4;
-	public final static int GENERATE_SSK_COLLISION = 5;
+	public final static int REQUEST_CHK = 1;
+	public final static int INSERT_CHK = 2;
+	public final static int REQUEST_SSK = 3;
+	public final static int INSERT_SSK = 4;
+	public final static int SSK_COLLISION = 5;
 	private final static int CHECK_TIMEOUTS = 6;
 }

@@ -1,11 +1,13 @@
 package sim;
+import sim.generators.SimplePublisher;
 
 class Sim
 {
 	private final int NODES = 100; // Number of nodes
 	private final int DEGREE = 4; // Average degree
 	private final double SPEED = 20000; // Bytes per second
-	private final double LATENCY = 0.1; // Seconds
+	private final double LATENCY = 0.1; // Latency of all links in seconds
+	private final double RATE = 0.01; // Inserts per second
 	private Node[] nodes;
 	
 	public Sim()
@@ -20,17 +22,16 @@ class Sim
 		// Connect the nodes
 		makeKleinbergNetwork();
 		
-		int key = Node.locationToKey (Math.random());
-		Event.schedule (nodes[0], 0.0,
-			Node.GENERATE_CHK_INSERT, key);
-		Event.schedule (nodes[NODES/4], 30.0,
-			Node.GENERATE_CHK_REQUEST, key);
-		Event.schedule (nodes[NODES/2], 60.0,
-			Node.GENERATE_CHK_INSERT, key);
-		Event.schedule (nodes[3*NODES/4], 90.0,
-			Node.GENERATE_CHK_REQUEST, key);
+		// One publisher, ten randomly chosen readers
+		SimplePublisher pub = new SimplePublisher (RATE, nodes[0]);
+		int readers = 0;
+		while (readers < 10) {
+			int index = (int) (Math.random() * NODES);
+			if (pub.addReader (nodes[index])) readers++;
+		}
 		
 		// Run the simulation
+		Event.duration = 3600.0;
 		Event.run();
 	}
 	
