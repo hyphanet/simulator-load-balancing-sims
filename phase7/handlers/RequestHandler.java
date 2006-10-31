@@ -1,8 +1,10 @@
 // The parent class of ChkRequestHandler and SskRequestHandler
 
-import messages.*;
+package sim.handlers;
+import sim.messages.*;
 
-abstract class RequestHandler extends MessageHandler implements EventTarget
+public abstract class RequestHandler extends MessageHandler
+					implements EventTarget
 {
 	public RequestHandler (Search s, Node node, Peer prev)
 	{

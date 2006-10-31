@@ -1,3 +1,4 @@
+package sim;
 import java.util.TreeSet; // Gotta love the collections framework...
 
 class Event implements Comparable

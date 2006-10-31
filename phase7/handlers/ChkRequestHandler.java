@@ -1,8 +1,9 @@
 // The state of a CHK request as stored at each node along the path
 
-import messages.*;
+package sim.handlers;
+import sim.messages.*;
 
-class ChkRequestHandler extends RequestHandler
+public class ChkRequestHandler extends RequestHandler
 {
 	private boolean[] received; // Keep track of received blocks
 	private int blocksReceived = 0;

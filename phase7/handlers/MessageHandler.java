@@ -1,10 +1,11 @@
 // The state of a search as stored at each node along the path
 
+package sim.handlers;
 import java.util.LinkedList;
-import messages.Search;
-import messages.Message;
+import sim.messages.Search;
+import sim.messages.Message;
 
-abstract class MessageHandler
+public abstract class MessageHandler
 {
 	// State machine
 	protected final static int STARTED = 0;

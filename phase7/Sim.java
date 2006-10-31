@@ -1,3 +1,5 @@
+package sim;
+
 class Sim
 {
 	private final int NODES = 100; // Number of nodes

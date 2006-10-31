@@ -1,5 +1,6 @@
 // Limited-capacity LRU cache
 
+package sim;
 import java.util.LinkedHashSet;
 
 class LruCache<Key>

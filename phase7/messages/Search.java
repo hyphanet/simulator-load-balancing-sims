@@ -1,4 +1,4 @@
-package messages;
+package sim.messages;
 
 public class Search extends Message
 {

@@ -1,8 +1,10 @@
+package sim;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collections;
-import messages.*;
+import sim.handlers.*;
+import sim.messages.*;
 
 class Node implements EventTarget
 {

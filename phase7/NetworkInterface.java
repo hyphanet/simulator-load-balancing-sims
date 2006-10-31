@@ -1,3 +1,6 @@
+// A node's low-level network interface
+
+package sim;
 import java.util.LinkedList;
 
 class NetworkInterface implements EventTarget

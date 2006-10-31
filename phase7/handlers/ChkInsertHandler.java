@@ -1,9 +1,10 @@
 // The state of a CHK insert as stored at each node along the path
 
+package sim.handlers;
 import java.util.HashSet;
-import messages.*;
+import sim.messages.*;
 
-class ChkInsertHandler extends MessageHandler implements EventTarget
+public class ChkInsertHandler extends MessageHandler implements EventTarget
 {
 	private int inState = STARTED; // State of incoming transfer
 	private HashSet<Peer> receivers; // Peers that should receive data

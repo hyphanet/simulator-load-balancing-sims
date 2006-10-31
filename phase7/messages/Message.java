@@ -1,6 +1,6 @@
 // A high-level message (as opposed to a low-level packet)
 
-package messages;
+package sim.messages;
 
 public class Message
 {

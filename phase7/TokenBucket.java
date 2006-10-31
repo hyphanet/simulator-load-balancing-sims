@@ -1,3 +1,5 @@
+package sim;
+
 class TokenBucket
 {
 	private double tokens, rate, size, lastUpdated;

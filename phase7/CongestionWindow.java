@@ -1,5 +1,7 @@
 // AIMD congestion control
 
+package sim;
+
 class CongestionWindow
 {
 	public final static int MIN_CWIND = Packet.MAX_SIZE; // Min window size

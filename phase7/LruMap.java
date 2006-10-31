@@ -1,5 +1,6 @@
 // Limited-capacity LRU cache that stores a value for each key
 
+package sim;
 import java.util.LinkedHashSet;
 import java.util.HashMap;
 

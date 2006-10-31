@@ -1,6 +1,6 @@
 // A single block of a multi-block transfer (currently 32 blocks per transfer)
 
-package messages;
+package sim.messages;
 
 public class Block extends Message
 {

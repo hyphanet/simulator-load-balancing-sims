@@ -1,8 +1,9 @@
 // A low-level packet (as opposed to a high-level message)
 
+package sim;
 import java.util.ArrayList;
-import messages.Message;
-import messages.Ack;
+import sim.messages.Message;
+import sim.messages.Ack;
 
 class Packet
 {

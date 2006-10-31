@@ -1,7 +1,8 @@
+package sim;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.HashSet;
-import messages.*;
+import sim.messages.*;
 
 class Peer
 {

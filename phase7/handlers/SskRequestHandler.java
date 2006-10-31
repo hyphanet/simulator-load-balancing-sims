@@ -1,8 +1,9 @@
 // The state of an SSK request as stored at each node along the path
 
-import messages.*;
+package sim.handlers;
+import sim.messages.*;
 
-class SskRequestHandler extends RequestHandler
+public class SskRequestHandler extends RequestHandler
 {
 	private boolean needPubKey; // Ask the next hop for the public key?
 	private SskPubKey pubKey = null;
