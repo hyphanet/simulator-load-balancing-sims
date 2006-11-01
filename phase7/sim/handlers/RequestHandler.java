@@ -132,7 +132,6 @@ public abstract class RequestHandler extends MessageHandler
 		}
 	}
 	
-	// Each EventTarget class has its own event codes
 	protected final static int ACCEPTED_TIMEOUT = 1;
 	protected final static int SEARCH_TIMEOUT = 2;
 	protected final static int TRANSFER_TIMEOUT = 3;

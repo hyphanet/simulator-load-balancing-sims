@@ -8,6 +8,9 @@ import java.util.Collections;
 
 public class Node implements EventTarget
 {
+	// Coarse-grained retransmission timer
+	public final static double RETX_TIMER = 0.1; // Seconds
+	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
@@ -21,7 +24,7 @@ public class Node implements EventTarget
 	private boolean decrementMaxHtl = false;
 	private boolean decrementMinHtl = false;
 	public TokenBucket bandwidth; // Bandwidth limiter
-	private boolean timerRunning = false; // Is the retx timer running?
+	private boolean timerRunning = false;
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -149,13 +152,13 @@ public class Node implements EventTarget
 		pubKeyCache.put (key);
 	}
 	
-	// Called by Peer
+	// Called by Peer after transmitting a packet
 	public void startTimer()
 	{
 		if (timerRunning) return;
-		// log ("starting retransmission/coalescing timer");
-		Event.schedule (this, Peer.MAX_DELAY, CHECK_TIMEOUTS, null);
 		timerRunning = true;
+		log ("starting retransmission timer");
+		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
 	// Called by NetworkInterface
@@ -385,20 +388,13 @@ public class Node implements EventTarget
 	
 	private void checkTimeouts()
 	{
-		// Check the peers in a random order each time
-		double deadline = Double.POSITIVE_INFINITY;
-		for (Peer p : peers())
-			deadline = Math.min (deadline, p.checkTimeouts());
-		if (deadline == Double.POSITIVE_INFINITY) {
-			// log ("stopping retransmission/coalescing timer");
+		boolean stopTimer = true;
+		for (Peer p : peers()) if (p.checkTimeouts()) stopTimer = false;
+		if (stopTimer) {
+			log ("stopping retransmission timer");
 			timerRunning = false;
 		}
-		else {
-			double sleep = deadline - Event.time();
-			if (sleep < Peer.MIN_SLEEP) sleep = Peer.MIN_SLEEP;
-			// log ("sleeping for " + sleep + " seconds");
-			Event.schedule (this, sleep, CHECK_TIMEOUTS, null);
-		}
+		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
 	// EventTarget interface
@@ -423,6 +419,7 @@ public class Node implements EventTarget
 			
 			case SSK_COLLISION:
 			generateSskInsert ((Integer) data, 1);
+			break;
 			
 			case CHECK_TIMEOUTS:
 			checkTimeouts();
@@ -430,7 +427,6 @@ public class Node implements EventTarget
 		}
 	}
 	
-	// Each EventTarget class has its own event codes
 	public final static int REQUEST_CHK = 1;
 	public final static int INSERT_CHK = 2;
 	public final static int REQUEST_SSK = 3;

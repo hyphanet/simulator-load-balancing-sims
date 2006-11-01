@@ -122,7 +122,6 @@ class NetworkInterface implements EventTarget
 		}
 	}
 	
-	// Each EventTarget class has its own event codes
 	public final static int RX_QUEUE = 1;
 	private final static int RX_END = 2;
 	private final static int TX_END = 3;

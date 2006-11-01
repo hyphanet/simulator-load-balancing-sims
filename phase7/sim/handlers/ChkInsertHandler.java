@@ -261,7 +261,6 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		}
 	}
 	
-	// Each EventTarget class has its own event codes
 	private final static int ACCEPTED_TIMEOUT = 1;
 	private final static int SEARCH_TIMEOUT = 2;
 	private final static int DATA_TIMEOUT = 3;

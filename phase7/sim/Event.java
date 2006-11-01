@@ -7,6 +7,7 @@ public class Event implements Comparable
 	
 	private static TreeSet<Event> queue = new TreeSet<Event>();
 	private static double clockTime = 0.0;
+	private static double lastLogTime = Double.POSITIVE_INFINITY;
 	private static int nextId = 0;
 	public static double duration = Double.POSITIVE_INFINITY;
 	
@@ -14,12 +15,13 @@ public class Event implements Comparable
 	{
 		queue.clear();
 		clockTime = 0.0;
+		lastLogTime = Double.POSITIVE_INFINITY;
 		nextId = 0;
 		duration = Double.POSITIVE_INFINITY;
 	}
 	
 	public static void schedule (EventTarget target, double time,
-				int type, Object data)
+					int type, Object data)
 	{
 		queue.add (new Event (target, time + clockTime, type, data));
 	}
@@ -50,6 +52,9 @@ public class Event implements Comparable
 	
 	public static void log (String message)
 	{
+		// Print a blank line between events
+		if (clockTime > lastLogTime) System.out.println();
+		lastLogTime = clockTime;
 		System.out.print (clockTime + " " + message + "\n");
 	}
 	
