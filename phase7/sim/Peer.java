@@ -18,8 +18,8 @@ public class Peer implements EventTarget
 	public final static double LINK_IDLE = 8.0; // RTTs without transmitting
 	
 	// Coalescing
-	private final static double MAX_DELAY = 0.1; // Max coalescing delay
-	private final static double MIN_SLEEP = 0.01; // Poll the b/w limiter
+	private final static double MAX_SLEEP = 0.1; // Max coalescing delay
+	private final static double MIN_SLEEP = 0.01; // Forty winks
 	
 	// Out-of-order delivery with duplicate detection
 	public final static int SEQ_RANGE = 1000;
@@ -36,6 +36,7 @@ public class Peer implements EventTarget
 	private double lastTransmission = Double.POSITIVE_INFINITY; // Time
 	private boolean tgif = false; // "Transfers go in first" toggle
 	private boolean timerRunning = false; // Coalescing timer
+	private double pollingInterval; // Poll the bandwidth limiter
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -53,12 +54,16 @@ public class Peer implements EventTarget
 		transferQueue = new DeadlineQueue<Message>();
 		window = new CongestionWindow (this);
 		rxDupe = new HashSet<Integer>();
+		// Poll the bandwidth limiter at reasonable intervals
+		pollingInterval = Packet.SENSIBLE_PAYLOAD / node.bandwidth.rate;
+		if (pollingInterval > MAX_SLEEP) pollingInterval = MAX_SLEEP;
+		if (pollingInterval < MIN_SLEEP) pollingInterval = MIN_SLEEP;
 	}
 	
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
-		m.deadline = Event.time() + MAX_DELAY;
+		m.deadline = Event.time() + MAX_SLEEP;
 		if (m instanceof Block) {
 			log (m + " added to transfer queue");
 			transferQueue.add (m);
@@ -77,7 +82,7 @@ public class Peer implements EventTarget
 	private void sendAck (int seq)
 	{
 		log ("ack " + seq + " added to ack queue");
-		ackQueue.add (new Ack (seq, Event.time() + MAX_DELAY));
+		ackQueue.add (new Ack (seq, Event.time() + MAX_SLEEP));
 		// Start the coalescing timer
 		startTimer();
 		// Send as many packets as possible
@@ -90,7 +95,7 @@ public class Peer implements EventTarget
 		if (timerRunning) return;
 		timerRunning = true;
 		log ("starting coalescing timer");
-		Event.schedule (this, MAX_DELAY, CHECK_DEADLINES, null);
+		Event.schedule (this, MAX_SLEEP, CHECK_DEADLINES, null);
 	}
 	
 	// Try to send a packet, return true if a packet was sent
@@ -221,7 +226,7 @@ public class Peer implements EventTarget
 				break;
 			}
 			// Fast retransmission
-			if (p.seq < seq && age > FRTO * rtt + MAX_DELAY) {
+			if (p.seq < seq && age > FRTO * rtt + MAX_SLEEP) {
 				p.sent = now;
 				log ("fast retransmitting packet " + p.seq);
 				node.net.send (p, address, latency);
@@ -245,7 +250,7 @@ public class Peer implements EventTarget
 		
 		double now = Event.time();
 		for (Packet p : txBuffer) {
-			if (now - p.sent > RTO * rtt + MAX_DELAY) {
+			if (now - p.sent > RTO * rtt + MAX_SLEEP) {
 				// Retransmission timeout
 				log ("retransmitting packet " + p.seq);
 				p.sent = now;
@@ -264,9 +269,10 @@ public class Peer implements EventTarget
 		// Find the next coalescing deadline - ignore message deadlines
 		// if there isn't room in the congestion window to send them
 		double dl = ackQueue.deadline();
-		if (searchQueue.headSize() <= window.available())
+		int win = window.available() -Packet.HEADER_SIZE -ackQueue.size;
+		if (searchQueue.headSize() <= win)
 			dl = Math.min (dl, searchQueue.deadline());
-		if (transferQueue.headSize() <= window.available())
+		if (transferQueue.headSize() <= win)
 			dl = Math.min (dl, transferQueue.deadline());
 		// If there's no deadline, stop the timer
 		if (dl == Double.POSITIVE_INFINITY) {
@@ -277,10 +283,32 @@ public class Peer implements EventTarget
 			return;
 		}
 		// Schedule the next check
-		double sleep = Math.max (dl - Event.time(), MIN_SLEEP);
+		double sleep = dl - Event.time();
+		if (shouldPoll()) sleep = Math.max (sleep, pollingInterval);
+		else sleep = Math.max (sleep, MIN_SLEEP);
 		timerRunning = true;
 		log ("sleeping for " + sleep + " seconds");
 		Event.schedule (this, sleep, CHECK_DEADLINES, null);
+	}
+	
+	// Are we waiting for the bandwidth limiter?
+	private boolean shouldPoll()
+	{
+		double now = Event.time();
+		if (ackQueue.deadline() < now + pollingInterval) return false;
+		
+		double bw = node.bandwidth.available();
+		double win = window.available();
+		
+		if (searchQueue.headSize() > bw
+		&& searchQueue.headSize() <= win
+		&& searchQueue.deadline() <= now) return true;
+		
+		if (transferQueue.headSize() > bw
+		&& transferQueue.headSize() <= win
+		&& transferQueue.deadline() <= now) return true;
+		
+		return false;
 	}
 	
 	public void log (String message)

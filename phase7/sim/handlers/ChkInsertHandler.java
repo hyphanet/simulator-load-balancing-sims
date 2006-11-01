@@ -71,6 +71,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		if (blocks[b.index] != null) return; // Ignore duplicates
 		blocks[b.index] = b;
 		blocksReceived++;
+		if (inState != TRANSFERRING) return; // Forward it later
 		// Forward the block to all receivers
 		for (Peer p : receivers) p.sendMessage (b);
 		// If the transfer is complete, consider finishing
