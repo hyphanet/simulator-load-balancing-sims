@@ -45,7 +45,7 @@ public class Node implements EventTarget
 		pubKeyCache = new LruCache<Integer> (1000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
-		bandwidth = new TokenBucket (30000, 60000);
+		bandwidth = new TokenBucket (15000, 30000);
 	}
 	
 	// Return true if a connection was added, false if already connected

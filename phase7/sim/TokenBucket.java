@@ -2,13 +2,14 @@ package sim;
 
 class TokenBucket
 {
-	private double tokens, rate, size, lastUpdated;
+	public final double rate, size;
+	private double tokens, lastUpdated;
 	
 	public TokenBucket (double rate, double size)
 	{
-		tokens = size;
 		this.rate = rate;
 		this.size = size;
+		tokens = size;
 		lastUpdated = 0.0; // Clock time
 	}
 	

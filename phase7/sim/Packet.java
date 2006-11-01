@@ -35,6 +35,12 @@ class Packet
 		size += m.size();
 	}
 	
+	public void addMessages (DeadlineQueue q, int maxSize)
+	{
+		while (q.size > 0 && size + q.headSize() <= maxSize)
+			addMessage (q.pop());
+	}
+	
 	public String toString()
 	{
 		return new String ("packet " + src + ":" + dest + ":" + seq);
