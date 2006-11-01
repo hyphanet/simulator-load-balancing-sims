@@ -128,7 +128,7 @@ public class Peer implements EventTarget
 		// Don't send empty packets
 		if (p.acks == null && p.messages == null) return false;
 		// Transmit the packet
-		log ("sending packet " + p.seq + ", " + p.size + " bytes");
+		log ("sending " + p + ", " + p.size + " bytes");
 		node.net.send (p, address, latency);
 		node.bandwidth.remove (p.size);
 		// If the packet contains data, buffer it for retransmission
@@ -230,7 +230,7 @@ public class Peer implements EventTarget
 			double age = now - p.sent;
 			// Explicit ack
 			if (p.seq == seq) {
-				log ("packet " + p.seq + " acknowledged");
+				log (p + " acknowledged");
 				i.remove();
 				// Update the congestion window
 				window.bytesAcked (p.size);
@@ -243,7 +243,7 @@ public class Peer implements EventTarget
 			// Fast retransmission
 			if (p.seq < seq && age > FRTO * rtt + MAX_DELAY) {
 				p.sent = now;
-				log ("fast retransmitting packet " + p.seq);
+				log ("fast retransmitting " + p);
 				node.net.send (p, address, latency);
 				window.fastRetransmission (now);
 			}
@@ -274,7 +274,7 @@ public class Peer implements EventTarget
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt + MAX_DELAY) {
 				// Retransmission timeout
-				log ("retransmitting packet " + p.seq);
+				log ("retransmitting " + p);
 				p.sent = now;
 				node.net.send (p, address, latency);
 				window.timeout (now);
