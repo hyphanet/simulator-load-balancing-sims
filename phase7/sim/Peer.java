@@ -42,6 +42,10 @@ public class Peer implements EventTarget
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
 	private int rxSeq = 0; // Sequence number of next in-order incoming pkt
 	
+	// Flow control
+	public int tokensOut = 0; // How many requests/inserts can we send?
+	public int tokensIn = 0; // How many requests/inserts should we accept?
+	
 	public Peer (Node node, int address, double location, double latency)
 	{
 		this.node = node;
@@ -201,7 +205,7 @@ public class Peer implements EventTarget
 			sendAck (p.seq);
 		}
 		// This indicates a misbehaving sender - discard the packet
-		else log ("warning: sequence number out of range");
+		else log ("WARNING: sequence number out of range");
 	}
 	
 	private void handleAck (Ack a)

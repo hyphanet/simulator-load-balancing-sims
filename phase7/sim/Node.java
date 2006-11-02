@@ -11,6 +11,10 @@ public class Node implements EventTarget
 	// Coarse-grained retransmission timer
 	public final static double RETX_TIMER = 0.1; // Seconds
 	
+	// Flow control
+	public final static int FLOW_TOKENS = 20; // Shared by all peers
+	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
+	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
@@ -25,6 +29,7 @@ public class Node implements EventTarget
 	private boolean decrementMinHtl = false;
 	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false;
+	private int spareTokens = FLOW_TOKENS; // Tokens not allocated to a peer
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -45,7 +50,9 @@ public class Node implements EventTarget
 		pubKeyCache = new LruCache<Integer> (16000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
-		bandwidth = new TokenBucket (15000, 60000);
+		bandwidth = new TokenBucket (40000, 60000);
+		// Allocate flow control tokens after a short delay
+		Event.schedule (this, Math.random(), ALLOCATE_TOKENS, null);
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -173,7 +180,9 @@ public class Node implements EventTarget
 	public void handleMessage (Message m, Peer src)
 	{
 		if (src != null) log ("received " + m + " from " + src);
-		if (m instanceof ChkRequest)
+		if (m instanceof Token)
+			handleToken ((Token) m, src);
+		else if (m instanceof ChkRequest)
 			handleChkRequest ((ChkRequest) m, src);
 		else if (m instanceof ChkInsert)
 			handleChkInsert ((ChkInsert) m, src);
@@ -188,6 +197,11 @@ public class Node implements EventTarget
 		}
 	}
 	
+	private void handleToken (Token t, Peer prev)
+	{
+		prev.tokensOut += t.id; // t.id is the number of tokens
+	}
+	
 	private void handleChkRequest (ChkRequest r, Peer prev)
 	{
 		if (!recentlySeenRequests.add (r.id)) {
@@ -198,6 +212,7 @@ public class Node implements EventTarget
 			if (mh != null) mh.removeNextHop (prev);
 			return;
 		}
+		if (!getToken (prev)) return;
 		// Accept the search
 		if (prev != null) {
 			log ("accepting " + r);
@@ -212,6 +227,7 @@ public class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
+			allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in CHK store");
@@ -224,6 +240,7 @@ public class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
+			allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in CHK cache");
@@ -243,6 +260,7 @@ public class Node implements EventTarget
 			if (mh != null) mh.removeNextHop (prev);
 			return;
 		}
+		if (!getToken (prev)) return;
 		// Accept the search
 		if (prev != null) {
 			log ("accepting " + i);
@@ -264,6 +282,7 @@ public class Node implements EventTarget
 			if (mh != null) mh.removeNextHop (prev);
 			return;
 		}
+		if (!getToken (prev)) return;
 		// Look up the public key
 		boolean pub = pubKeyCache.get (r.key);
 		if (pub) log ("public key " + r.key + " found in cache");
@@ -284,6 +303,7 @@ public class Node implements EventTarget
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
 			}
+			allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in SSK store");
@@ -298,6 +318,7 @@ public class Node implements EventTarget
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
 			}
+			allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in SSK cache");
@@ -317,6 +338,7 @@ public class Node implements EventTarget
 			if (mh != null) mh.removeNextHop (prev);
 			return;
 		}
+		if (!getToken (prev)) return;
 		// Look up the public key
 		boolean pub = pubKeyCache.get (i.key);
 		if (pub) log ("public key " + i.key + " found in cache");
@@ -336,7 +358,43 @@ public class Node implements EventTarget
 	{
 		MessageHandler mh = messageHandlers.remove (id);
 		if (mh == null) log ("no message handler to remove for " + id);
-		else log ("removing message handler for " + id);
+		else {
+			log ("removing message handler for " + id);
+			allocateToken (mh.prev);
+		}
+	}
+	
+	// Check whether the peer sendng a request or insert has enough tokens
+	private boolean getToken (Peer p)
+	{
+		if (p == null) {
+			if (spareTokens == 0) {
+				// The client will have to wait
+				log ("not enough tokens");
+				return false;
+			}
+			spareTokens--;
+			return true;
+		}
+		else {
+			if (p.tokensIn == 0) {
+				// This indicates a misbehaving sender
+				log ("WARNING: not enough tokens");
+				return false;
+			}
+			p.tokensIn--;
+			return true;
+		}
+	}
+	
+	// Give another token to the peer whose request/insert just completed
+	private void allocateToken (Peer p)
+	{
+		if (p == null) spareTokens++;
+		else {
+			p.tokensIn++;
+			p.sendMessage (new Token (1));
+		}
 	}
 	
 	// Return the list of peers in a random order
@@ -352,16 +410,14 @@ public class Node implements EventTarget
 		Event.log (net.address + " " + message);
 	}
 	
-	// Event callbacks
-	
-	private void generateChkRequest (int key)
+	public void generateChkRequest (int key)
 	{
 		ChkRequest cr = new ChkRequest (key, location);
 		log ("generating " + cr);
 		handleChkRequest (cr, null);
 	}
 	
-	private void generateChkInsert (int key)
+	public void generateChkInsert (int key)
 	{
 		ChkInsert ci = new ChkInsert (key, location);
 		log ("generating " + ci);
@@ -371,14 +427,14 @@ public class Node implements EventTarget
 			handleMessage (new Block (ci.id, i), null);
 	}
 	
-	private void generateSskRequest (int key)
+	public void generateSskRequest (int key)
 	{
 		SskRequest sr = new SskRequest (key, location, true);
 		log ("generating " + sr);
 		handleSskRequest (sr, null);
 	}
 	
-	private void generateSskInsert (int key, int value)
+	public void generateSskInsert (int key, int value)
 	{
 		SskInsert si = new SskInsert (key, value, location);
 		log ("generating " + si);
@@ -395,6 +451,18 @@ public class Node implements EventTarget
 			timerRunning = false;
 		}
 		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
+	}
+	
+	// Allocate all flow control tokens at startup
+	private void allocateTokens()
+	{
+		// Rounding error in your favour - collect 50 tokens
+		int tokensPerPeer = FLOW_TOKENS / (peers.size() + 1);
+		for (Peer p : peers.values()) {
+			p.tokensIn += tokensPerPeer;
+			spareTokens -= tokensPerPeer;
+			p.sendMessage (new Token (tokensPerPeer));
+		}
 	}
 	
 	// EventTarget interface
@@ -424,6 +492,10 @@ public class Node implements EventTarget
 			case CHECK_TIMEOUTS:
 			checkTimeouts();
 			break;
+			
+			case ALLOCATE_TOKENS:
+			allocateTokens();
+			break;
 		}
 	}
 	
@@ -433,4 +505,5 @@ public class Node implements EventTarget
 	public final static int INSERT_SSK = 4;
 	public final static int SSK_COLLISION = 5;
 	private final static int CHECK_TIMEOUTS = 6;
+	private final static int ALLOCATE_TOKENS = 7;
 }

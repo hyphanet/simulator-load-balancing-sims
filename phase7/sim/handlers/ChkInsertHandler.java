@@ -62,7 +62,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Start the search
 		forwardSearch();
 		// If we have all the blocks and the headers, consider finishing
-		if (blocksReceived == 32 && inState == TRANSFERRING) {
+		if (blocksReceived == 32) {
 			inState = COMPLETED;
 			considerFinishing();
 		}
@@ -110,6 +110,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void handleRejectedLoop (RejectedLoop rl)
 	{
 		if (searchState != SENT) node.log (rl + " out of order");
+		next.tokensOut++; // No token was consumed
 		forwardSearch();
 	}
 	
@@ -158,6 +159,9 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		> Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
 		node.log (this + " has htl " + htl);
+		// Consume a token
+		next.tokensOut--;
+		// Forward the search
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);

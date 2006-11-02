@@ -28,6 +28,7 @@ public abstract class RequestHandler extends MessageHandler
 	protected void handleRejectedLoop (RejectedLoop rl)
 	{
 		if (searchState != SENT) node.log (rl + " out of order");
+		next.tokensOut++; // No token was consumed
 		forwardSearch();
 	}
 	
@@ -73,6 +74,9 @@ public abstract class RequestHandler extends MessageHandler
 		> Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
 		node.log (this + " has htl " + htl);
+		// Consume a token
+		next.tokensOut--;
+		// Forward the search
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);

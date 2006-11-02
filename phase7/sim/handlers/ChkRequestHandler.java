@@ -42,7 +42,7 @@ public class ChkRequestHandler extends RequestHandler
 		searchState = TRANSFERRING;
 		if (prev != null) prev.sendMessage (df); // Forward the message
 		// If we have all the blocks and the headers, cache the data
-		if (blocksReceived == 32 && searchState == TRANSFERRING) {
+		if (blocksReceived == 32) {
 			node.cacheChk (key);
 			if (prev == null) node.log (this + " succeeded");
 			finish();

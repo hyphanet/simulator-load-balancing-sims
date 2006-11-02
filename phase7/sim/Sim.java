@@ -5,7 +5,7 @@ class Sim
 {
 	private final int NODES = 100; // Number of nodes
 	private final int DEGREE = 5; // Average degree
-	private final double SPEED = 40000; // Network speed, bytes per second
+	private final double SPEED = 15000; // Network speed, bytes per second
 	private final double LATENCY = 0.1; // Latency of all links in seconds
 	private final int INSERTS = 100; // Number of inserts per publisher
 	private Node[] nodes;

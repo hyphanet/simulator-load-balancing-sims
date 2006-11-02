@@ -21,8 +21,8 @@ public abstract class MessageHandler
 	protected double closest; // The closest location seen so far
 	protected int htl; // Hops to live for backtracking
 	
-	protected Node node; // The owner of this MessageHandler
-	protected Peer prev; // The previous hop of the search
+	public final Node node; // The owner of this MessageHandler
+	public final Peer prev; // The previous hop of the search
 	protected Peer next = null; // The (current) next hop of the search
 	protected LinkedList<Peer> nexts; // Candidates for the next hop
 	protected int searchState = STARTED; // The state of the search
@@ -60,13 +60,17 @@ public abstract class MessageHandler
 		double closestDist = Double.POSITIVE_INFINITY;
 		Peer closestPeer = null;
 		for (Peer peer : nexts) {
+			if (peer.tokensOut == 0) {
+				node.log ("bypassing busy peer " + peer);
+				continue;
+			}
 			double dist = Node.distance (keyLoc, peer.location);
 			if (dist < closestDist) {
 				closestDist = dist;
 				closestPeer = peer;
 			}
 		}
-		return closestPeer; // Null if the list was empty
+		return closestPeer; // Null if there are no suitable peers
 	}
 	
 	public abstract void handleMessage (Message m, Peer src);

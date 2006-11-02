@@ -36,7 +36,7 @@ public class SimplePublisher implements EventTarget
 	{
 		// Insert a random key
 		int key = Node.locationToKey (Math.random());
-		Event.schedule (node, 0.0, Node.INSERT_CHK, key);
+		node.generateChkInsert (key);
 		// Inform each reader after an average of ten minutes
 		for (Node n : readers) {
 			double delay = 595.0 + Math.random() * 10.0;
