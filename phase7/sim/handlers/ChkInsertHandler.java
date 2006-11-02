@@ -61,8 +61,13 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		inState = TRANSFERRING;
 		// Start the search
 		forwardSearch();
+		// If we have all the blocks and the headers, consider finishing
+		if (blocksReceived == 32 && inState == TRANSFERRING) {
+			inState = COMPLETED;
+			considerFinishing();
+		}
 		// Wait for transfer to complete (FIXME: check real timeout)
-		Event.schedule (this, 120.0, TRANSFER_IN_TIMEOUT, null);
+		else Event.schedule (this, 120.0, TRANSFER_IN_TIMEOUT, null);
 	}
 	
 	private void handleBlock (Block b)
@@ -72,10 +77,9 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		blocks[b.index] = b;
 		blocksReceived++;
 		// Forward the block to all receivers
-		if (inState == TRANSFERRING)
-			for (Peer p : receivers) p.sendMessage (b);
-		// If the transfer is complete, consider finishing
-		if (blocksReceived == 32) {
+		for (Peer p : receivers) p.sendMessage (b);
+		// If we have all the blocks and the headers, consider finishing
+		if (blocksReceived == 32 && inState == TRANSFERRING) {
 			inState = COMPLETED;
 			considerFinishing();
 		}

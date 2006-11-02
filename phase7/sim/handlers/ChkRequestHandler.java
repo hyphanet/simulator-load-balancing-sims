@@ -6,13 +6,13 @@ import sim.messages.*;
 
 public class ChkRequestHandler extends RequestHandler
 {
-	private Block[] blocks; // Store incoming blocks for forwarding
+	private boolean[] blocks; // Keep track of blocks received
 	private int blocksReceived = 0;
 	
 	public ChkRequestHandler (ChkRequest r, Node node, Peer prev)
 	{
 		super (r, node, prev);
-		blocks = new Block[32];
+		blocks = new boolean[32];
 	}
 	
 	public void handleMessage (Message m, Peer src)
@@ -40,32 +40,30 @@ public class ChkRequestHandler extends RequestHandler
 	{
 		if (searchState != ACCEPTED) node.log (df + " out of order");
 		searchState = TRANSFERRING;
-		if (prev != null) {
-			// Forward the message & all previously received blocks
-			prev.sendMessage (df);
-			for (int i = 0; i < 32; i++)
-				if (blocks[i] != null)
-					prev.sendMessage (blocks[i]);
+		if (prev != null) prev.sendMessage (df); // Forward the message
+		// If we have all the blocks and the headers, cache the data
+		if (blocksReceived == 32 && searchState == TRANSFERRING) {
+			node.cacheChk (key);
+			if (prev == null) node.log (this + " succeeded");
+			finish();
 		}
 		// Wait for the transfer to complete (FIXME: check real timeout)
-		Event.schedule (this, 120.0, TRANSFER_TIMEOUT, next);
+		else Event.schedule (this, 120.0, TRANSFER_TIMEOUT, next);
 	}
 	
 	private void handleBlock (Block b)
 	{
 		if (searchState != TRANSFERRING) node.log (b + " out of order");
-		if (blocks[b.index] != null) return; // Ignore duplicates
-		blocks[b.index] = b;
+		if (blocks[b.index]) return; // Ignore duplicates
+		blocks[b.index] = true;
 		blocksReceived++;
-		if (searchState == TRANSFERRING) {
-			// Forward the block
-			if (prev != null) {
-				node.log ("forwarding " + b);
-				prev.sendMessage (b);
-			}
+		// Forward the block
+		if (prev != null) {
+			node.log ("forwarding " + b);
+			prev.sendMessage (b);
 		}
-		// If the transfer is complete, cache the data
-		if (blocksReceived == 32) {
+		// If we have all the blocks and the headers, cache the data
+		if (blocksReceived == 32 && searchState == TRANSFERRING) {
 			node.cacheChk (key);
 			if (prev == null) node.log (this + " succeeded");
 			finish();
