@@ -71,9 +71,9 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		if (blocks[b.index] != null) return; // Ignore duplicates
 		blocks[b.index] = b;
 		blocksReceived++;
-		if (inState != TRANSFERRING) return; // Forward it later
 		// Forward the block to all receivers
-		for (Peer p : receivers) p.sendMessage (b);
+		if (inState == TRANSFERRING)
+			for (Peer p : receivers) p.sendMessage (b);
 		// If the transfer is complete, consider finishing
 		if (blocksReceived == 32) {
 			inState = COMPLETED;
@@ -197,7 +197,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != SENT) return;
-		node.log (this + " accepted timeout waiting for " + p);
+		node.log (this + " accepted timeout for " + p);
 		forwardSearch(); // Try another peer
 	}
 	
@@ -205,7 +205,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout waiting for " + p);
+		node.log (this + " search timeout for " + p);
 		if (prev == null) node.log (this + " failed");
 		searchState = COMPLETED;
 		considerFinishing();
@@ -214,7 +214,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void dataTimeout()
 	{
 		if (inState != STARTED) return;
-		node.log (this + " data timeout waiting for " + prev);
+		node.log (this + " data timeout for " + prev);
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (new TransfersCompleted (id));
 		finish();
@@ -223,7 +223,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void transferInTimeout()
 	{
 		if (inState != TRANSFERRING) return;
-		node.log (this + " transfer timeout receiving from " + prev);
+		node.log (this + " transfer timeout from " + prev);
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (new TransfersCompleted (id));
 		finish();
@@ -232,7 +232,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void transferOutTimeout (Peer p)
 	{
 		if (!receivers.remove (p)) return;
-		node.log (this + " transfer timeout sending to " + p);
+		node.log (this + " transfer timeout to " + p);
 		considerFinishing();
 	}
 	

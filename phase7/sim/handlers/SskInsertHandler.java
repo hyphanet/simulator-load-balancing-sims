@@ -174,7 +174,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void keyTimeout()
 	{
 		if (searchState != STARTED) return;
-		node.log (this + " key timeout waiting for " + prev);
+		node.log (this + " key timeout for " + prev);
 		finish();
 	}
 	
@@ -182,7 +182,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != SENT) return;
-		node.log (this + " accepted timeout waiting for " + p);
+		node.log (this + " accepted timeout for " + p);
 		forwardSearch(); // Try another peer
 	}
 	
@@ -190,7 +190,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout waiting for " + p);
+		node.log (this + " search timeout for " + p);
 		if (prev == null) node.log (this + " failed");
 		finish();
 	}

@@ -5,14 +5,14 @@ import java.util.LinkedList;
 
 class NetworkInterface implements EventTarget
 {
-	public int address; // Represents an IP address and port
+	public final int address; // Represents an IP address and port
 	private Node node; // The owner of this network interface
 	private double txSpeed, rxSpeed; // Bytes per second
 	
 	private LinkedList<Packet> txQueue; // Queue of outgoing packets
 	private LinkedList<Packet> rxQueue; // Queue of incoming packets
-	private int txQueueSize, rxQueueSize; // Limited-size drop-tail queues
-	private int txQueueMaxSize, rxQueueMaxSize; // Bytes
+	private int txQueueSize, rxQueueSize; // Number of bytes in each queue
+	private int txQueueMaxSize, rxQueueMaxSize; // Drop-tail queues
 	
 	public NetworkInterface (Node node, double txSpeed, double rxSpeed)
 	{

@@ -38,14 +38,14 @@ public class Node implements EventTarget
 		peers = new HashMap<Integer,Peer>();
 		recentlySeenRequests = new HashSet<Integer>();
 		messageHandlers = new HashMap<Integer,MessageHandler>();
-		chkStore = new LruCache<Integer> (1000);
-		chkCache = new LruCache<Integer> (1000);
-		sskStore = new LruMap<Integer,Integer> (1000);
-		sskCache = new LruMap<Integer,Integer> (1000);
-		pubKeyCache = new LruCache<Integer> (1000);
+		chkStore = new LruCache<Integer> (16000);
+		chkCache = new LruCache<Integer> (16000);
+		sskStore = new LruMap<Integer,Integer> (16000);
+		sskCache = new LruMap<Integer,Integer> (16000);
+		pubKeyCache = new LruCache<Integer> (16000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
-		bandwidth = new TokenBucket (15000, 30000);
+		bandwidth = new TokenBucket (15000, 60000);
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -157,7 +157,7 @@ public class Node implements EventTarget
 	{
 		if (timerRunning) return;
 		timerRunning = true;
-		log ("starting retransmission timer");
+		// log ("starting retransmission timer");
 		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
@@ -391,7 +391,7 @@ public class Node implements EventTarget
 		boolean stopTimer = true;
 		for (Peer p : peers()) if (p.checkTimeouts()) stopTimer = false;
 		if (stopTimer) {
-			log ("stopping retransmission timer");
+			// log ("stopping retransmission timer");
 			timerRunning = false;
 		}
 		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);

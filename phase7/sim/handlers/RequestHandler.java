@@ -93,7 +93,7 @@ public abstract class RequestHandler extends MessageHandler
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != SENT) return;
-		node.log (this + " accepted timeout waiting for " + p);
+		node.log (this + " accepted timeout for " + p);
 		forwardSearch(); // Try another peer
 	}
 	
@@ -101,7 +101,7 @@ public abstract class RequestHandler extends MessageHandler
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout waiting for " + p);
+		node.log (this + " search timeout for " + p);
 		if (prev == null) node.log (this + " failed");
 		finish();
 	}
@@ -109,7 +109,7 @@ public abstract class RequestHandler extends MessageHandler
 	protected void transferTimeout (Peer p)
 	{
 		if (searchState != TRANSFERRING) return;
-		node.log (this + " transfer timeout receiving from " + p);
+		node.log (this + " transfer timeout from " + p);
 		if (prev == null) node.log (this + " failed");
 		finish();
 	}

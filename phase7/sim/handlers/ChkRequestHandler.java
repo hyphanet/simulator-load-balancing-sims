@@ -57,11 +57,12 @@ public class ChkRequestHandler extends RequestHandler
 		if (blocks[b.index] != null) return; // Ignore duplicates
 		blocks[b.index] = b;
 		blocksReceived++;
-		if (searchState == TRANSFERRING) return; // Forward it later
-		// Forward the block
-		if (prev != null) {
-			node.log ("forwarding " + b);
-			prev.sendMessage (b);
+		if (searchState == TRANSFERRING) {
+			// Forward the block
+			if (prev != null) {
+				node.log ("forwarding " + b);
+				prev.sendMessage (b);
+			}
 		}
 		// If the transfer is complete, cache the data
 		if (blocksReceived == 32) {
@@ -79,5 +80,5 @@ public class ChkRequestHandler extends RequestHandler
 	public String toString()
 	{
 		return new String ("CHK request (" + id + "," + key + ")");
-	}
+	}	
 }

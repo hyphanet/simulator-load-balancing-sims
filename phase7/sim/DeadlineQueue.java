@@ -6,7 +6,7 @@ import java.util.LinkedList;
 
 class DeadlineQueue<MESSAGE extends Message>
 {
-	public int size = 0; // Size in bytes
+	public int size = 0; // Size of the queue in bytes
 	private LinkedList<MESSAGE> messages = new LinkedList<MESSAGE>();
 	
 	public void add (MESSAGE m)
