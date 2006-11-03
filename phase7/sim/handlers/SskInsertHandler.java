@@ -35,7 +35,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void checkCollision()
 	{
 		Integer old = node.fetchSsk (key);
-		if (old != null && old != data) {
+		if (old != null && old.intValue() != data) {
 			node.log (this + " collided");
 			if (prev == null) node.log (this + " collided locally");
 			else prev.sendMessage (new SskDataFound (id, old));
