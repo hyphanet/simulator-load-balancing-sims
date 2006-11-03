@@ -156,7 +156,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Decrement the htl if the next node is not the closest so far
 		double target = Node.keyToLocation (key);
 		if (Node.distance (target, next.location)
-		> Node.distance (target, closest))
+		>= Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
 		node.log (this + " has htl " + htl);
 		// Consume a token
