@@ -196,7 +196,7 @@ public class Peer implements EventTarget
 				node.handleMessage (m, this);
 			sendAck (p.seq);
 		}
-		else if (p.seq < rxSeq + SEQ_RANGE * 2) {
+		else if (p.seq < rxSeq + SEQ_RANGE) {
 			log ("packet out of order");
 			rxDupe.add (p.seq);
 			// Deliver the messages to the node
