@@ -158,6 +158,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		searchState = COMPLETED;
 		node.cachePubKey (key);
+		node.storePubKey (key);
 		node.cacheSsk (key, data);
 		node.storeSsk (key, data);
 		node.removeMessageHandler (id);

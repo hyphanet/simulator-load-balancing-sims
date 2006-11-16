@@ -23,9 +23,10 @@ public class Node implements EventTarget
 	private HashMap<Integer,MessageHandler> messageHandlers; // By ID
 	private LruCache<Integer> chkStore;
 	private LruCache<Integer> chkCache;
-	private LruMap<Integer,Integer> sskStore; // SSKs can collide
+	private LruMap<Integer,Integer> sskStore; // SSKs can collide, use a Map
 	private LruMap<Integer,Integer> sskCache;
-	private LruCache<Integer> pubKeyCache; // SSK public keys
+	private LruCache<Integer> pubKeyStore; // SSK public keys
+	private LruCache<Integer> pubKeyCache;
 	private boolean decrementMaxHtl = false;
 	private boolean decrementMinHtl = false;
 	public TokenBucket bandwidth; // Bandwidth limiter
@@ -49,6 +50,7 @@ public class Node implements EventTarget
 		chkCache = new LruCache<Integer> (16000);
 		sskStore = new LruMap<Integer,Integer> (16000);
 		sskCache = new LruMap<Integer,Integer> (16000);
+		pubKeyStore = new LruCache<Integer> (16000);
 		pubKeyCache = new LruCache<Integer> (16000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
@@ -159,6 +161,16 @@ public class Node implements EventTarget
 	{
 		log ("public key " + key + " added to cache");
 		pubKeyCache.put (key);
+	}
+	
+	// Consider adding a public key to the store
+	public void storePubKey (int key)
+	{
+		if (closerThanPeers (keyToLocation (key))) {
+			log ("public key " + key + " added to store");
+			pubKeyStore.put (key);
+		}
+		else log ("public key " + key + " not added to store");
 	}
 	
 	// Called by Peer to start the retransmission timer
@@ -314,7 +326,7 @@ public class Node implements EventTarget
 		}
 		if (!getToken (prev)) return;
 		// Look up the public key
-		boolean pub = pubKeyCache.get (r.key);
+		boolean pub = pubKeyStore.get (r.key) || pubKeyCache.get(r.key);
 		if (pub) log ("public key " + r.key + " found in cache");
 		else log ("public key " + r.key + " not found in cache");
 		// Accept the search
@@ -370,7 +382,7 @@ public class Node implements EventTarget
 		}
 		if (!getToken (prev)) return;
 		// Look up the public key
-		boolean pub = pubKeyCache.get (i.key);
+		boolean pub = pubKeyStore.get (i.key) || pubKeyCache.get(i.key);
 		if (pub) log ("public key " + i.key + " found in cache");
 		else log ("public key " + i.key + " not found in cache");
 		// Accept the search

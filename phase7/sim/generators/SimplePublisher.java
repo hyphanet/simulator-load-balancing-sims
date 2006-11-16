@@ -1,5 +1,5 @@
-// A simple publisher that inserts CHKs using a Poisson process and informs
-// each reader of each key after an average of ten minutes
+// A simple publisher that inserts keys using a Poisson process and informs
+// each reader after an average of ten minutes
 
 package sim.generators;
 import sim.Event;
@@ -9,6 +9,9 @@ import java.util.HashSet;
 
 public class SimplePublisher implements EventTarget
 {
+	// FIXME: what fraction of keys are CHKs in real life?
+	private final static double FRACTION_CHKS = 0.5;
+	
 	public final double rate; // Inserts per second
 	private int inserts; // Publish this many inserts (0 for unlimited)
 	private Node node; // The publisher's node
@@ -30,9 +33,14 @@ public class SimplePublisher implements EventTarget
 		return readers.add (n);
 	}
 	
-	// Event callbacks
-	
 	private void publish()
+	{
+		// Randomly choose between publishing a CHK and an SSK
+		if (Math.random() < FRACTION_CHKS) publishChk();
+		else publishSsk();
+	}
+	
+	private void publishChk()
 	{
 		// Insert a random key
 		int key = Node.locationToKey (Math.random());
@@ -41,6 +49,22 @@ public class SimplePublisher implements EventTarget
 		for (Node n : readers) {
 			double delay = 595.0 + Math.random() * 10.0;
 			Event.schedule (n, delay, Node.REQUEST_CHK, key);
+		}
+		// Schedule the next insert after an exp. distributed delay
+		if (inserts > 0 && --inserts == 0) return;
+		double delay = -Math.log (Math.random()) / rate;
+		Event.schedule (this, delay, PUBLISH, null);
+	}
+	
+	private void publishSsk()
+	{
+		// Insert a random key
+		int key = Node.locationToKey (Math.random());
+		node.generateSskInsert (key, 0);
+		// Inform each reader after an average of ten minutes
+		for (Node n : readers) {
+			double delay = 595.0 + Math.random() * 10.0;
+			Event.schedule (n, delay, Node.REQUEST_SSK, key);
 		}
 		// Schedule the next insert after an exp. distributed delay
 		if (inserts > 0 && --inserts == 0) return;
