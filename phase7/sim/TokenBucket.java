@@ -14,7 +14,7 @@ class TokenBucket
 		if (poll > Peer.MAX_DELAY) poll = Peer.MAX_DELAY;
 		this.poll = poll; // Polling interval in seconds
 		tokens = size;
-		lastUpdated = 0.0; // Clock time
+		lastUpdated = 0.0; // Time
 	}
 	
 	public int available()

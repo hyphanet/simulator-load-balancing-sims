@@ -57,6 +57,8 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 				handleSskAccepted ((SskAccepted) m);
 			else if (m instanceof RejectedLoop)
 				handleRejectedLoop ((RejectedLoop) m);
+			else if (m instanceof RejectedOverload)
+				handleRejectedOverload ((RejectedOverload) m);
 			else if (m instanceof RouteNotFound)
 				handleRouteNotFound ((RouteNotFound) m);
 			else if (m instanceof SskDataFound)
@@ -86,24 +88,10 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 		if (sa.needPubKey) next.sendMessage (pubKey);
 	}
 	
-	private void handleRejectedLoop (RejectedLoop rl)
-	{
-		if (searchState != SENT) node.log (rl + " out of order");
-		next.tokensOut++; // No token was consumed
-		forwardSearch();
-	}
-	
-	private void handleRouteNotFound (RouteNotFound rnf)
-	{
-		if (searchState != ACCEPTED) node.log (rnf + " out of order");
-		if (rnf.htl < htl) htl = rnf.htl;
-		// Use the remaining htl to try another peer
-		forwardSearch();
-	}
-	
 	private void handleCollision (SskDataFound sdf)
 	{
 		if (searchState != ACCEPTED) node.log (sdf + " out of order");
+		// FIXME: should we reset the backoff length?
 		if (prev == null) node.log (this + " collided");
 		else prev.sendMessage (sdf); // Forward the message
 		data = sdf.data; // Is this safe?
@@ -112,49 +100,29 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void handleInsertReply (InsertReply ir)
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
+		next.successNotOverload(); // Reset the backoff length
 		if (prev == null) node.log (this + " succeeded");
 		else prev.sendMessage (ir); // Forward the message
 		finish();
 	}
 	
-	public void forwardSearch()
+	protected void sendReply()
 	{
-		next = null;
-		// If the search has run out of hops, send InsertReply
-		if (htl == 0) {
-			node.log (this + " has no hops left");
-			if (prev == null) node.log (this + " succeeded");
-			else prev.sendMessage (new InsertReply (id));
-			finish();
-			return;
-		}
-		// Forward the search to the closest remaining peer
-		next = closestPeer();
-		if (next == null) {
-			node.log ("route not found for " + this);
-			if (prev == null) node.log (this + " failed");
-			else prev.sendMessage (new RouteNotFound (id, htl));
-			finish();
-			return;
-		}
-		// Decrement the htl if the next node is not the closest so far
-		double target = Node.keyToLocation (key);
-		if (Node.distance (target, next.location)
-		>= Node.distance (target, closest))
-			htl = node.decrementHtl (htl);
-		node.log (this + " has htl " + htl);
-		// Consume a token
-		next.tokensOut--;
-		// Forward the search
-		node.log ("forwarding " + this + " to " + next.address);
-		next.sendMessage (makeSearchMessage());
-		nexts.remove (next);
-		searchState = SENT;
-		// Wait 10 seconds for the next hop to accept the search
+		if (prev == null) node.log (this + " succeeded");
+		else prev.sendMessage (new InsertReply (id));
+	}
+	
+	protected Search makeSearchMessage()
+	{
+		return new SskInsert (id, key, data, closest, htl);
+	}
+	
+	protected void scheduleAcceptedTimeout (Peer next)
+	{
 		Event.schedule (this, 10.0, ACCEPTED_TIMEOUT, next);
 	}
 	
-	private void finish()
+	protected void finish()
 	{
 		searchState = COMPLETED;
 		node.cachePubKey (key);
@@ -164,39 +132,16 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 		node.removeMessageHandler (id);
 	}
 	
-	protected Search makeSearchMessage()
-	{
-		return new SskInsert (id, key, data, closest, htl);
-	}
-	
 	public String toString()
 	{
 		return new String ("SSK insert (" +id+ "," +key+ "," +data+")");
 	}
 	
-	// Event callbacks
-	
+	// Event callback
 	private void keyTimeout()
 	{
 		if (searchState != STARTED) return;
 		node.log (this + " key timeout for " + prev);
-		finish();
-	}
-	
-	private void acceptedTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != SENT) return;
-		node.log (this + " accepted timeout for " + p);
-		forwardSearch(); // Try another peer
-	}
-	
-	private void searchTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout for " + p);
-		if (prev == null) node.log (this + " failed");
 		finish();
 	}
 	

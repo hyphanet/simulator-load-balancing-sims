@@ -28,6 +28,8 @@ public class SskRequestHandler extends RequestHandler
 			handleAccepted ((Accepted) m);
 		else if (m instanceof RejectedLoop)
 			handleRejectedLoop ((RejectedLoop) m);
+		else if (m instanceof RejectedOverload)
+			handleRejectedOverload ((RejectedOverload) m);
 		else if (m instanceof RouteNotFound)
 			handleRouteNotFound ((RouteNotFound) m);
 		else if (m instanceof DataNotFound)
@@ -42,6 +44,7 @@ public class SskRequestHandler extends RequestHandler
 	private void handleSskDataFound (SskDataFound df)
 	{
 		if (searchState != ACCEPTED) node.log (df + " out of order");
+		next.successNotOverload(); // Reset the backoff length
 		dataFound = df;
 		if (pubKey == null) return; // Keep waiting
 		if (prev == null) node.log (this + " succeeded");
@@ -57,6 +60,7 @@ public class SskRequestHandler extends RequestHandler
 	private void handleSskPubKey (SskPubKey pk)
 	{
 		if (searchState != ACCEPTED) node.log (pk + " out of order");
+		next.successNotOverload(); // Reset the backoff length
 		pubKey = pk;
 		if (dataFound == null) return; // Keep waiting
 		if (prev == null) node.log (this + " succeeded");

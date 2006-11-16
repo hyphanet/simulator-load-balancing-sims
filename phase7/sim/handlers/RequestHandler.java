@@ -21,67 +21,28 @@ public abstract class RequestHandler extends MessageHandler
 	{
 		if (searchState != SENT) node.log (a + " out of order");
 		searchState = ACCEPTED;
+		next.successNotOverload(); // Reset the backoff length
 		// Wait 60 seconds for a reply to the search
 		Event.schedule (this, 60.0, SEARCH_TIMEOUT, next);
-	}
-	
-	protected void handleRejectedLoop (RejectedLoop rl)
-	{
-		if (searchState != SENT) node.log (rl + " out of order");
-		next.tokensOut++; // No token was consumed
-		forwardSearch();
-	}
-	
-	protected void handleRouteNotFound (RouteNotFound rnf)
-	{
-		if (searchState != ACCEPTED) node.log (rnf + " out of order");
-		if (rnf.htl < htl) htl = rnf.htl;
-		// Use the remaining htl to try another peer
-		forwardSearch();
 	}
 	
 	protected void handleDataNotFound (DataNotFound dnf)
 	{
 		if (searchState != ACCEPTED) node.log (dnf + " out of order");
+		next.successNotOverload(); // Reset the backoff length
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (dnf); // Forward the message
 		finish();
 	}
 	
-	protected void forwardSearch()
+	protected void sendReply()
 	{
-		next = null;
-		// If the search has run out of hops, send DataNotFound
-		if (htl == 0) {
-			node.log ("data not found for " + this);
-			if (prev == null) node.log (this + " failed");
-			else prev.sendMessage (new DataNotFound (id));
-			finish();
-			return;
-		}
-		// Forward the search to the closest remaining peer
-		next = closestPeer();
-		if (next == null) {
-			node.log ("route not found for " + this);
-			if (prev == null) node.log (this + " failed");
-			else prev.sendMessage (new RouteNotFound (id, htl));
-			finish();
-			return;
-		}
-		// Decrement the htl if the next node is not the closest so far
-		double target = Node.keyToLocation (key);
-		if (Node.distance (target, next.location)
-		>= Node.distance (target, closest))
-			htl = node.decrementHtl (htl);
-		node.log (this + " has htl " + htl);
-		// Consume a token
-		next.tokensOut--;
-		// Forward the search
-		node.log ("forwarding " + this + " to " + next.address);
-		next.sendMessage (makeSearchMessage());
-		nexts.remove (next);
-		searchState = SENT;
-		// Wait 5 seconds for the next hop to accept the search
+		if (prev == null) node.log (this + " failed");
+		else prev.sendMessage (new DataNotFound (id));
+	}
+	
+	protected void scheduleAcceptedTimeout (Peer next)
+	{
 		Event.schedule (this, 5.0, ACCEPTED_TIMEOUT, next);
 	}
 	
@@ -91,25 +52,7 @@ public abstract class RequestHandler extends MessageHandler
 		node.removeMessageHandler (id);
 	}
 	
-	// Event callbacks
-	
-	protected void acceptedTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != SENT) return;
-		node.log (this + " accepted timeout for " + p);
-		forwardSearch(); // Try another peer
-	}
-	
-	protected void searchTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout for " + p);
-		if (prev == null) node.log (this + " failed");
-		finish();
-	}
-	
+	// Event callback
 	protected void transferTimeout (Peer p)
 	{
 		if (searchState != TRANSFERRING) return;

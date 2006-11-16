@@ -39,6 +39,8 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 				handleAccepted ((Accepted) m);
 			else if (m instanceof RejectedLoop)
 				handleRejectedLoop ((RejectedLoop) m);
+			else if (m instanceof RejectedOverload)
+				handleRejectedOverload ((RejectedOverload) m);
 			else if (m instanceof RouteNotFound)
 				handleRouteNotFound ((RouteNotFound) m);
 			else if (m instanceof InsertReply)
@@ -62,10 +64,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Start the search
 		forwardSearch();
 		// If we have all the blocks and the headers, consider finishing
-		if (blocksReceived == 32) {
-			inState = COMPLETED;
-			considerFinishing();
-		}
+		if (blocksReceived == 32) finish();
 		// Wait for transfer to complete (FIXME: check real timeout)
 		else Event.schedule (this, 120.0, TRANSFER_IN_TIMEOUT, null);
 	}
@@ -79,22 +78,21 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Forward the block to all receivers
 		for (Peer p : receivers) p.sendMessage (b);
 		// If we have all the blocks and the headers, consider finishing
-		if (blocksReceived == 32 && inState == TRANSFERRING) {
-			inState = COMPLETED;
-			considerFinishing();
-		}
+		if (blocksReceived == 32 && inState == TRANSFERRING) finish();
 	}
 	
 	private void handleCompleted (TransfersCompleted tc, Peer src)
 	{
 		receivers.remove (src);
-		considerFinishing();
+		if (searchState == COMPLETED && inState == COMPLETED 
+		&& receivers.isEmpty()) reallyFinish();
 	}
 	
 	private void handleAccepted (Accepted a)
 	{
 		if (searchState != SENT) node.log (a + " out of order");
 		searchState = ACCEPTED;
+		next.successNotOverload(); // Reset the backoff length
 		// Wait 120 seconds for a reply to the search
 		Event.schedule (this, 120.0, SEARCH_TIMEOUT, next);
 		// Add the next hop to the list of receivers
@@ -107,78 +105,40 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		Event.schedule (this, 240.0, TRANSFER_OUT_TIMEOUT, next);
 	}
 	
-	private void handleRejectedLoop (RejectedLoop rl)
-	{
-		if (searchState != SENT) node.log (rl + " out of order");
-		next.tokensOut++; // No token was consumed
-		forwardSearch();
-	}
-	
-	private void handleRouteNotFound (RouteNotFound rnf)
-	{
-		if (searchState != ACCEPTED) node.log (rnf + " out of order");
-		if (rnf.htl < htl) htl = rnf.htl;
-		// Use the remaining htl to try another peer
-		forwardSearch();
-	}
-	
 	private void handleInsertReply (InsertReply ir)
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
+		next.successNotOverload(); // Reset the backoff length
 		if (prev == null) node.log (this + " succeeded");
 		else prev.sendMessage (ir); // Forward the message
-		searchState = COMPLETED;
-		considerFinishing();
+		finish();
+	}
+
+	protected void sendReply()
+	{
+		if (prev == null) node.log (this + " succeeded");
+		else prev.sendMessage (new InsertReply (id));
 	}
 	
-	public void forwardSearch()
+	protected Search makeSearchMessage()
 	{
-		next = null;
-		// If the search has run out of hops, send InsertReply
-		if (htl == 0) {
-			node.log (this + " has no hops left");
-			if (prev == null) node.log (this + " succeeded");
-			else prev.sendMessage (new InsertReply (id));
-			searchState = COMPLETED;
-			considerFinishing();
-			return;
-		}
-		// Forward the search to the closest remaining peer
-		next = closestPeer();
-		if (next == null) {
-			node.log ("route not found for " + this);
-			if (prev == null) node.log (this + " failed");
-			else prev.sendMessage (new RouteNotFound (id, htl));
-			searchState = COMPLETED;
-			considerFinishing();
-			return;
-		}
-		// Decrement the htl if the next node is not the closest so far
-		double target = Node.keyToLocation (key);
-		if (Node.distance (target, next.location)
-		>= Node.distance (target, closest))
-			htl = node.decrementHtl (htl);
-		node.log (this + " has htl " + htl);
-		// Consume a token
-		next.tokensOut--;
-		// Forward the search
-		node.log ("forwarding " + this + " to " + next.address);
-		next.sendMessage (makeSearchMessage());
-		nexts.remove (next);
-		searchState = SENT;
-		// Wait 10 seconds for the next hop to accept the search
+		return new ChkInsert (id, key, closest, htl);
+	}
+	
+	protected void scheduleAcceptedTimeout (Peer next)
+	{
 		Event.schedule (this, 10.0, ACCEPTED_TIMEOUT, next);
 	}
 	
-	private void considerFinishing()
+	protected void finish()
 	{
-		// An insert finishes when the search, the incoming transfer
+		// Don't really finish until the incoming transfer
 		// and all outgoing transfers are complete
-		if (searchState == COMPLETED && inState == COMPLETED 
-		&& receivers.isEmpty()) finish();
+		searchState = COMPLETED;
+		if (inState == COMPLETED && receivers.isEmpty()) reallyFinish();
 	}
 	
-	private void finish()
+	private void reallyFinish()
 	{
 		inState = COMPLETED;
 		searchState = COMPLETED;
@@ -189,59 +149,39 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		node.removeMessageHandler (id);
 	}
 	
-	protected Search makeSearchMessage()
-	{
-		return new ChkInsert (id, key, closest, htl);
-	}
-	
 	public String toString()
 	{
 		return new String ("CHK insert (" + id + "," + key + ")");
 	}
 	
-	// Event callbacks
-	
-	private void acceptedTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != SENT) return;
-		node.log (this + " accepted timeout for " + p);
-		forwardSearch(); // Try another peer
-	}
-	
-	private void searchTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout for " + p);
-		if (prev == null) node.log (this + " failed");
-		searchState = COMPLETED;
-		considerFinishing();
-	}
-	
+	// Event callback
 	private void dataTimeout()
 	{
 		if (inState != STARTED) return;
-		node.log (this + " data timeout for " + prev);
+		node.log (this + " data timeout from " + prev);
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (new TransfersCompleted (id));
-		finish();
+		reallyFinish();
 	}
 	
+	// Event callback
 	private void transferInTimeout()
 	{
 		if (inState != TRANSFERRING) return;
 		node.log (this + " transfer timeout from " + prev);
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (new TransfersCompleted (id));
-		finish();
+		reallyFinish();
 	}
 	
+	// Event callback
 	private void transferOutTimeout (Peer p)
 	{
 		if (!receivers.remove (p)) return;
 		node.log (this + " transfer timeout to " + p);
-		considerFinishing();
+		// FIXME: should we back off?
+		if (searchState == COMPLETED && inState == COMPLETED 
+		&& receivers.isEmpty()) reallyFinish();
 	}
 	
 	// EventTarget interface

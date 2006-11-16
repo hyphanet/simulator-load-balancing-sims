@@ -246,6 +246,7 @@ public class Node implements EventTarget
 	
 	private void handleChkRequest (ChkRequest r, Peer prev)
 	{
+		// FIXME: reject if overloaded
 		if (!recentlySeenRequests.add (r.id)) {
 			log ("rejecting recently seen " + r);
 			prev.sendMessage (new RejectedLoop (r.id));
@@ -294,6 +295,7 @@ public class Node implements EventTarget
 	
 	private void handleChkInsert (ChkInsert i, Peer prev)
 	{
+		// FIXME: reject if overloaded
 		if (!recentlySeenRequests.add (i.id)) {
 			log ("rejecting recently seen " + i);
 			prev.sendMessage (new RejectedLoop (i.id));
@@ -316,6 +318,7 @@ public class Node implements EventTarget
 	
 	private void handleSskRequest (SskRequest r, Peer prev)
 	{
+		// FIXME: reject if overloaded
 		if (!recentlySeenRequests.add (r.id)) {
 			log ("rejecting recently seen " + r);
 			prev.sendMessage (new RejectedLoop (r.id));
@@ -372,6 +375,7 @@ public class Node implements EventTarget
 	
 	private void handleSskInsert (SskInsert i, Peer prev)
 	{
+		// FIXME: reject if overloaded
 		if (!recentlySeenRequests.add (i.id)) {
 			log ("rejecting recently seen " + i);
 			prev.sendMessage (new RejectedLoop (i.id));

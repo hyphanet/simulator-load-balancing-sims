@@ -6,7 +6,7 @@ public class Event implements Comparable
 	// Static variables and methods for the event queue
 	
 	private static TreeSet<Event> queue = new TreeSet<Event>();
-	private static double clockTime = 0.0;
+	private static double now = 0.0;
 	private static double lastLogTime = Double.POSITIVE_INFINITY;
 	private static int nextId = 0;
 	public static double duration = Double.POSITIVE_INFINITY;
@@ -14,16 +14,16 @@ public class Event implements Comparable
 	public static void reset()
 	{
 		queue.clear();
-		clockTime = 0.0;
+		now = 0.0;
 		lastLogTime = Double.POSITIVE_INFINITY;
 		nextId = 0;
 		duration = Double.POSITIVE_INFINITY;
 	}
 	
-	public static void schedule (EventTarget target, double time,
+	public static void schedule (EventTarget target, double delay,
 					int type, Object data)
 	{
-		queue.add (new Event (target, time + clockTime, type, data));
+		queue.add (new Event (target, delay + now, type, data));
 	}
 	
 	public static boolean nextEvent()
@@ -32,9 +32,9 @@ public class Event implements Comparable
 			Event e = queue.first();
 			queue.remove (e);
 			// Update the clock
-			clockTime = e.time;
+			now = e.time;
 			// Quit if the simulation's alloted time has run out
-			if (clockTime > duration) return false;
+			if (now > duration) return false;
 			// Pass the packet to the target's callback method
 			e.target.handleEvent (e.type, e.data);
 			return true;
@@ -47,15 +47,15 @@ public class Event implements Comparable
 	
 	public static double time()
 	{
-		return clockTime;
+		return now;
 	}
 	
 	public static void log (String message)
 	{
 		// Print a blank line between events
-		if (clockTime > lastLogTime) System.out.println();
-		lastLogTime = clockTime;
-		System.out.print (clockTime + " " + message + "\n");
+		if (now > lastLogTime) System.out.println();
+		lastLogTime = now;
+		System.out.print (now + " " + message + "\n");
 	}
 	
 	// Run until the duration expires or there are no more events to process
@@ -72,7 +72,7 @@ public class Event implements Comparable
 	private int type;
 	private Object data;
 	
-	public Event (EventTarget target, double time, int type, Object data)
+	private Event (EventTarget target, double time, int type, Object data)
 	{
 		this.target = target;
 		this.time = time;

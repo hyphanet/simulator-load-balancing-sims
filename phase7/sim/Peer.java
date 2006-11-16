@@ -21,6 +21,11 @@ public class Peer implements EventTarget
 	public final static double MAX_DELAY = 0.1; // Max coalescing delay
 	public final static double MIN_SLEEP = 0.01; // Forty winks
 	
+	// Backoff
+	public final static double INITIAL_BACKOFF = 1.0; // Seconds
+	public final static double BACKOFF_MULTIPLIER = 2.0;
+	public final static double MAX_BACKOFF = 10800000.0; // Three hours!?
+	
 	// Out-of-order delivery with duplicate detection
 	public final static int SEQ_RANGE = 65536;
 	
@@ -44,6 +49,8 @@ public class Peer implements EventTarget
 	// Flow control
 	public int tokensOut = 0; // How many requests/inserts can we send?
 	public int tokensIn = 0; // How many requests/inserts should we accept?
+	public double backoffUntil = 0.0; // Time
+	public double backoffLength = INITIAL_BACKOFF; // Seconds
 	
 	public Peer (Node node, int address, double location, double latency)
 	{
@@ -130,6 +137,7 @@ public class Peer implements EventTarget
 		return false;
 	}
 	
+	// Try to send a packet up to the specified size, return true if sent
 	private boolean sendPacket (int maxSize)
 	{
 		// Construct a packet
@@ -240,6 +248,25 @@ public class Peer implements EventTarget
 		// Send as many packets a possible
 		if (timerRunning) while (send());
 		else checkDeadlines();
+	}
+	
+	// When a local RejectedOverload is received, back off unless backed off
+	public void localRejectedOverload()
+	{
+		double now = Event.time();
+		if (now < backoffUntil) return; // Already backed off
+		backoffLength *= BACKOFF_MULTIPLIER;
+		if (backoffLength > MAX_BACKOFF) backoffLength = MAX_BACKOFF;
+		backoffUntil = now + backoffLength * Math.random();
+		log ("backing off until " + backoffUntil);
+	}
+	
+	// When a search is accepted, reset the backoff length unless backed off
+	public void successNotOverload()
+	{
+		if (Event.time() < backoffUntil) return;
+		backoffLength = INITIAL_BACKOFF;
+		log ("resetting backoff length");
 	}
 	
 	// Check retx timeouts, return true if there are packets in flight
