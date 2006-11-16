@@ -314,7 +314,7 @@ public class Peer implements EventTarget
 	
 	public void log (String message)
 	{
-		Event.log (node.net.address + ":" + address + " " + message);
+		// Event.log (node.net.address + ":" + address + " " + message);
 	}
 	
 	public String toString()

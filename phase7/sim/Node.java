@@ -14,7 +14,7 @@ public class Node implements EventTarget
 	// Flow control
 	public final static int FLOW_TOKENS = 20; // Shared by all peers
 	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
-	public final static double DELAY_DECAY = 0.9; // Exp moving average
+	public final static double DELAY_DECAY = 0.99; // Exp moving average
 	
 	public double location; // Routing location
 	public NetworkInterface net;
@@ -31,7 +31,7 @@ public class Node implements EventTarget
 	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false;
 	private int spareTokens = FLOW_TOKENS; // Tokens not allocated to a peer
-	private double bwDelay = 0.0; // Average delay caused by b/w limiter
+	private double delay = 0.0; // Delay caused by congestion or b/w limiter
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -179,12 +179,11 @@ public class Node implements EventTarget
 		if (p.messages != null) {
 			double now = Event.time();
 			for (Message m : p.messages) {
-				double delay = now - m.deadline;
-				log ("bandwidth delay " + delay);
-				bwDelay *= DELAY_DECAY;
-				bwDelay += delay * (1.0 - DELAY_DECAY);
+				double d = now - m.deadline;
+				delay *= DELAY_DECAY;
+				delay += d * (1.0 - DELAY_DECAY);
 			}
-			log ("average bandwidth delay " + bwDelay);
+			log ("average message delay " + delay);
 		}
 		// Send the packet
 		net.sendPacket (p);
