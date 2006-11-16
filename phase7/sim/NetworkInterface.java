@@ -28,12 +28,9 @@ class NetworkInterface implements EventTarget
 		address = Network.register (this);
 	}
 		
-	// Called by Peer
-	public void send (Packet p, int dest, double latency)
+	// Called by Node
+	public void sendPacket (Packet p)
 	{
-		p.src = address;
-		p.dest = dest;
-		p.latency = latency;
 		if (txQueueSize + p.size > txQueueMaxSize) {
 			log ("no room in txQueue, " + p + " lost");
 			return;
@@ -75,7 +72,7 @@ class NetworkInterface implements EventTarget
 		log ("finished receiving " + p);
 		node.handlePacket (p);
 		rxQueueSize -= p.size;
-		rxQueue.remove (p);
+		rxQueue.poll();
 		// If there's another packet waiting, start to receive it
 		if (!rxQueue.isEmpty()) rxStart (rxQueue.peek());
 	}
@@ -94,7 +91,7 @@ class NetworkInterface implements EventTarget
 		log ("finished transmitting " + p);
 		Network.deliver (p);
 		txQueueSize -= p.size;
-		txQueue.remove (p);
+		txQueue.poll();
 		// If there's another packet waiting, start to transmit it
 		if (!txQueue.isEmpty()) txStart (txQueue.peek());
 	}

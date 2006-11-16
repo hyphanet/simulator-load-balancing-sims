@@ -18,11 +18,11 @@ public class Peer implements EventTarget
 	public final static double LINK_IDLE = 8.0; // RTTs without transmitting
 	
 	// Coalescing
-	private final static double MAX_SLEEP = 0.1; // Max coalescing delay
-	private final static double MIN_SLEEP = 0.01; // Forty winks
+	public final static double MAX_DELAY = 0.1; // Max coalescing delay
+	public final static double MIN_SLEEP = 0.01; // Forty winks
 	
 	// Out-of-order delivery with duplicate detection
-	public final static int SEQ_RANGE = 1000;
+	public final static int SEQ_RANGE = 65536;
 	
 	// Sender state
 	private double rtt = 5.0; // Estimated round-trip time in seconds
@@ -36,7 +36,6 @@ public class Peer implements EventTarget
 	private double lastTransmission = Double.POSITIVE_INFINITY; // Time
 	private boolean tgif = false; // "Transfers go in first" toggle
 	private boolean timerRunning = false; // Coalescing timer
-	private double pollingInterval; // Poll the bandwidth limiter
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -58,16 +57,12 @@ public class Peer implements EventTarget
 		transferQueue = new DeadlineQueue<Message>();
 		window = new CongestionWindow (this);
 		rxDupe = new HashSet<Integer>();
-		// Poll the bandwidth limiter at reasonable intervals
-		pollingInterval = Packet.SENSIBLE_PAYLOAD / node.bandwidth.rate;
-		if (pollingInterval > MAX_SLEEP) pollingInterval = MAX_SLEEP;
-		if (pollingInterval < MIN_SLEEP) pollingInterval = MIN_SLEEP;
 	}
 	
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
-		m.deadline = Event.time() + MAX_SLEEP;
+		m.deadline = Event.time() + MAX_DELAY;
 		if (m instanceof Block) {
 			log (m + " added to transfer queue");
 			transferQueue.add (m);
@@ -86,7 +81,7 @@ public class Peer implements EventTarget
 	private void sendAck (int seq)
 	{
 		log ("ack " + seq + " added to ack queue");
-		ackQueue.add (new Ack (seq, Event.time() + MAX_SLEEP));
+		ackQueue.add (new Ack (seq, Event.time() + MAX_DELAY));
 		// Start the coalescing timer
 		startTimer();
 		// Send as many packets as possible
@@ -99,7 +94,7 @@ public class Peer implements EventTarget
 		if (timerRunning) return;
 		timerRunning = true;
 		log ("starting coalescing timer");
-		Event.schedule (this, MAX_SLEEP, CHECK_DEADLINES, null);
+		Event.schedule (this, MAX_DELAY, CHECK_DEADLINES, null);
 	}
 	
 	// Try to send a packet, return true if a packet was sent
@@ -138,9 +133,11 @@ public class Peer implements EventTarget
 	private boolean sendPacket (int maxSize)
 	{
 		// Construct a packet
-		Packet p = new Packet();
+		Packet p = new Packet (node.net.address, address, latency);
+		// Add all waiting acks to the packet
 		while (ackQueue.size > 0) p.addAck (ackQueue.pop());
 		log ((maxSize - p.size) + " bytes available for messages");
+		// Don't allow more than SEQ_RANGE payloads to be in flight
 		if (txSeq <= txMaxSeq) {
 			// Alternate priority between searches and transfers
 			if (tgif) {
@@ -161,8 +158,7 @@ public class Peer implements EventTarget
 		if (p.acks == null && p.messages == null) return false;
 		// Transmit the packet
 		log ("sending packet " + p.seq + ", " + p.size + " bytes");
-		node.net.send (p, address, latency);
-		node.bandwidth.remove (p.size);
+		node.sendPacket (p);
 		// If the packet contains data, buffer it for retransmission
 		if (p.messages != null) {
 			p.sent = Event.time();
@@ -230,10 +226,10 @@ public class Peer implements EventTarget
 				break;
 			}
 			// Fast retransmission
-			if (p.seq < seq && age > FRTO * rtt + MAX_SLEEP) {
+			if (p.seq < seq && age > FRTO * rtt + MAX_DELAY) {
 				p.sent = now;
 				log ("fast retransmitting packet " + p.seq);
-				node.net.send (p, address, latency);
+				node.resendPacket (p);
 				window.fastRetransmission (now);
 			}
 		}
@@ -254,11 +250,11 @@ public class Peer implements EventTarget
 		
 		double now = Event.time();
 		for (Packet p : txBuffer) {
-			if (now - p.sent > RTO * rtt + MAX_SLEEP) {
+			if (now - p.sent > RTO * rtt + MAX_DELAY) {
 				// Retransmission timeout
 				log ("retransmitting packet " + p.seq);
 				p.sent = now;
-				node.net.send (p, address, latency);
+				node.resendPacket (p);
 				window.timeout (now);
 			}
 		}
@@ -288,7 +284,7 @@ public class Peer implements EventTarget
 		}
 		// Schedule the next check
 		double sleep = dl - Event.time();
-		if (shouldPoll()) sleep = Math.max (sleep, pollingInterval);
+		if (shouldPoll()) sleep = Math.max (sleep, node.bandwidth.poll);
 		else sleep = Math.max (sleep, MIN_SLEEP);
 		timerRunning = true;
 		log ("sleeping for " + sleep + " seconds");
@@ -299,25 +295,26 @@ public class Peer implements EventTarget
 	private boolean shouldPoll()
 	{
 		double now = Event.time();
-		if (ackQueue.deadline() < now + pollingInterval) return false;
-		
+		// Will we need to send an ack before the next polling interval?
+		if (ackQueue.deadline() < now + node.bandwidth.poll)
+			return false;
 		double bw = node.bandwidth.available();
 		double win = window.available();
-		
+		// Is there an overdue search that's waiting for bandwidth?
 		if (searchQueue.headSize() > bw
 		&& searchQueue.headSize() <= win
 		&& searchQueue.deadline() <= now) return true;
-		
+		// Is there an overdue transfer that's waiting for bandwidth?
 		if (transferQueue.headSize() > bw
 		&& transferQueue.headSize() <= win
 		&& transferQueue.deadline() <= now) return true;
-		
+		// We're waiting for something other than bandwidth
 		return false;
 	}
 	
 	public void log (String message)
 	{
-		// Event.log (node.net.address + ":" + address + " " + message);
+		Event.log (node.net.address + ":" + address + " " + message);
 	}
 	
 	public String toString()

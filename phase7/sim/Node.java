@@ -14,6 +14,7 @@ public class Node implements EventTarget
 	// Flow control
 	public final static int FLOW_TOKENS = 20; // Shared by all peers
 	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
+	public final static double DELAY_DECAY = 0.9; // Exp moving average
 	
 	public double location; // Routing location
 	public NetworkInterface net;
@@ -30,6 +31,7 @@ public class Node implements EventTarget
 	public TokenBucket bandwidth; // Bandwidth limiter
 	private boolean timerRunning = false;
 	private int spareTokens = FLOW_TOKENS; // Tokens not allocated to a peer
+	private double bwDelay = 0.0; // Average delay caused by b/w limiter
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -159,21 +161,50 @@ public class Node implements EventTarget
 		pubKeyCache.put (key);
 	}
 	
-	// Called by Peer after transmitting a packet
+	// Called by Peer to start the retransmission timer
 	public void startTimer()
 	{
 		if (timerRunning) return;
 		timerRunning = true;
-		// log ("starting retransmission timer");
+		log ("starting retransmission timer");
 		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
-	// Called by NetworkInterface
-	public void handlePacket (Packet packet)
+	// Called by Peer to transmit a packet for the first time
+	public void sendPacket (Packet p)
 	{
-		Peer peer = peers.get (packet.src);
+		// Update the bandwidth limiter
+		bandwidth.remove (p.size);
+		// Update the average bandwidth delay
+		if (p.messages != null) {
+			double now = Event.time();
+			for (Message m : p.messages) {
+				double delay = now - m.deadline;
+				log ("bandwidth delay " + delay);
+				bwDelay *= DELAY_DECAY;
+				bwDelay += delay * (1.0 - DELAY_DECAY);
+			}
+			log ("average bandwidth delay " + bwDelay);
+		}
+		// Send the packet
+		net.sendPacket (p);
+	}
+	
+	// Called by Peer to retransmit a packet
+	public void resendPacket (Packet p)
+	{
+		// Update the bandwidth limiter
+		bandwidth.remove (p.size);
+		// Send the packet
+		net.sendPacket (p);
+	}
+	
+	// Called by NetworkInterface
+	public void handlePacket (Packet p)
+	{
+		Peer peer = peers.get (p.src);
 		if (peer == null) log ("received packet from unknown peer");
-		else peer.handlePacket (packet);
+		else peer.handlePacket (p);
 	}
 	
 	// Called by Peer
@@ -447,7 +478,7 @@ public class Node implements EventTarget
 		boolean stopTimer = true;
 		for (Peer p : peers()) if (p.checkTimeouts()) stopTimer = false;
 		if (stopTimer) {
-			// log ("stopping retransmission timer");
+			log ("stopping retransmission timer");
 			timerRunning = false;
 		}
 		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);

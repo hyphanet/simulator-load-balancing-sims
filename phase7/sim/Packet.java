@@ -12,14 +12,21 @@ class Packet
 	public final static int MAX_SIZE = 1450; // MTU including headers
 	public final static int SENSIBLE_PAYLOAD = 1000; // Coalescing
 	
-	public int src, dest; // Network addresses
+	public final int src, dest; // Network addresses
 	public int size = HEADER_SIZE; // Size in bytes, including headers
 	public int seq = -1; // Data sequence number (-1 if no data)
 	public ArrayList<Ack> acks = null;
 	public ArrayList<Message> messages = null;
 	
 	public double sent; // Time at which the packet was (re) transmitted
-	public double latency; // Link latency (stored here for convenience)
+	public double latency; // Link latency, stored here for convenience
+	
+	public Packet (int src, int dest, double latency)
+	{
+		this.src = src;
+		this.dest = dest;
+		this.latency = latency;
+	}
 	
 	public void addAck (Ack a)
 	{
