@@ -17,14 +17,14 @@ public class ChkRequestHandler extends RequestHandler
 	
 	public void handleMessage (Message m, Peer src)
 	{
-		if (m instanceof RejectedOverload)
-			handleOverload ((RejectedOverload) m, src);
-		else if (src != next)
+		if (src != next)
 			node.log ("unexpected source for " + m);
 		else if (m instanceof Accepted)
 			handleAccepted ((Accepted) m);
 		else if (m instanceof RejectedLoop)
 			handleRejectedLoop ((RejectedLoop) m);
+		else if (m instanceof RejectedOverload)
+			handleOverload ((RejectedOverload) m, src);
 		else if (m instanceof RouteNotFound)
 			handleRouteNotFound ((RouteNotFound) m);
 		else if (m instanceof DataNotFound)
