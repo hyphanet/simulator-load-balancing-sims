@@ -222,7 +222,7 @@ public class Node implements EventTarget
 	{
 		if (timerRunning) return;
 		timerRunning = true;
-		log ("starting retransmission timer");
+		// log ("starting retransmission timer");
 		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
@@ -235,6 +235,7 @@ public class Node implements EventTarget
 		if (p.messages != null) {
 			double now = Event.time();
 			for (Message m : p.messages) {
+				log ("sending " + m + " to " + p.dest);
 				double d = now - m.deadline;
 				delay *= DELAY_DECAY;
 				delay += d * (1.0 - DELAY_DECAY);
@@ -520,7 +521,7 @@ public class Node implements EventTarget
 		boolean stopTimer = true;
 		for (Peer p : peers()) if (p.checkTimeouts()) stopTimer = false;
 		if (stopTimer) {
-			log ("stopping retransmission timer");
+			// log ("stopping retransmission timer");
 			timerRunning = false;
 		}
 		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
