@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedList;
 
 public class Node implements EventTarget
 {
@@ -14,6 +15,7 @@ public class Node implements EventTarget
 	// Flow control
 	public final static boolean USE_TOKENS = false;
 	public final static boolean USE_BACKOFF = false;
+	public final static boolean USE_THROTTLE = false;
 	public final static int FLOW_TOKENS = 20; // Shared by all peers
 	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
 	public final static double DELAY_DECAY = 0.99; // Exp moving average
@@ -37,6 +39,8 @@ public class Node implements EventTarget
 	private boolean timerRunning = false;
 	private int spareTokens = FLOW_TOKENS; // Tokens not allocated to a peer
 	private double delay = 0.0; // Delay caused by congestion or b/w limiter
+	private LinkedList<Search> searchQueue;
+	private SearchThrottle searchThrottle;
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -62,6 +66,8 @@ public class Node implements EventTarget
 		// Allocate flow control tokens after a short delay
 		if (USE_TOKENS) Event.schedule (this, Math.random() * 0.1,
 						ALLOCATE_TOKENS, null);
+		searchQueue = new LinkedList<Search>();
+		if (USE_THROTTLE) searchThrottle = new SearchThrottle();
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -133,12 +139,9 @@ public class Node implements EventTarget
 	// Reject a request or insert if the node appears to be overloaded
 	private boolean rejectIfOverloaded (Peer prev, int id)
 	{
+		if (prev == null) return false;
 		if (shouldRejectSearch()) {
-			if (prev == null) {
-				// FIXME
-				log ("rejecting local search " + id);
-			}
-			else prev.sendMessage (new RejectedOverload (id, true));
+			prev.sendMessage (new RejectedOverload (id, true));
 			return true;
 		}
 		return false;
@@ -419,13 +422,13 @@ public class Node implements EventTarget
 	
 	public void searchSucceeded (MessageHandler m)
 	{
-		// FIXME: increase the rate of the relevant throttle
 		log (m + " succeeded");
+		if (USE_THROTTLE) searchThrottle.increaseRate();
 	}
 	
 	public void reduceSearchRate (MessageHandler m)
 	{
-		// FIXME: reduce the rate of the relevant throttle
+		if (USE_THROTTLE) searchThrottle.decreaseRate();
 	}
 	
 	public void removeMessageHandler (int id)
@@ -484,36 +487,71 @@ public class Node implements EventTarget
 		Event.log (net.address + " " + message);
 	}
 	
+	// Add a search to the queue
+	private void addToSearchQueue (Search s)
+	{
+		searchQueue.add (s);
+		if (USE_THROTTLE && searchQueue.size() == 1) {
+			double now = Event.time();
+			double then = searchThrottle.nextSearchTime (now);
+			Event.schedule (this, then - now, SEND_SEARCH, null);
+		}
+		else sendSearch();
+	}
+	
+	// Remove the first search from the queue and send it
+	private void sendSearch()
+	{
+		Search s = searchQueue.poll();
+		if (s instanceof ChkRequest)
+			handleChkRequest ((ChkRequest) s, null);
+		else if (s instanceof ChkInsert) {
+			handleChkInsert ((ChkInsert) s, null);
+			handleMessage (new DataInsert (s.id), null);
+			for (int i = 0; i < 32; i++)
+				handleMessage (new Block (s.id, i), null);
+		}
+		else if (s instanceof SskRequest)
+			handleSskRequest ((SskRequest) s, null);
+		else if (s instanceof SskInsert) {
+			pubKeyCache.put (s.key);
+			handleSskInsert ((SskInsert) s, null);
+		}
+		if (USE_THROTTLE) {
+			searchThrottle.searchSent();
+			if (searchQueue.isEmpty()) return;
+			double now = Event.time();
+			double then = searchThrottle.nextSearchTime (now);
+			Event.schedule (this, then - now, SEND_SEARCH, null);
+		}
+	}
+	
 	public void generateChkRequest (int key)
 	{
 		ChkRequest cr = new ChkRequest (key, location);
 		log ("generating " + cr);
-		handleChkRequest (cr, null);
+		addToSearchQueue (cr);
 	}
 	
 	public void generateChkInsert (int key)
 	{
 		ChkInsert ci = new ChkInsert (key, location);
 		log ("generating " + ci);
-		handleChkInsert (ci, null);
-		handleMessage (new DataInsert (ci.id), null);
-		for (int i = 0; i < 32; i++)
-			handleMessage (new Block (ci.id, i), null);
+		addToSearchQueue (ci);
 	}
 	
 	public void generateSskRequest (int key)
 	{
 		SskRequest sr = new SskRequest (key, location, true);
 		log ("generating " + sr);
-		handleSskRequest (sr, null);
+		addToSearchQueue (sr);
 	}
 	
 	public void generateSskInsert (int key, int value)
 	{
 		SskInsert si = new SskInsert (key, value, location);
 		log ("generating " + si);
-		pubKeyCache.put (key);
-		handleSskInsert (si, null);
+		addToSearchQueue (si);
 	}
 	
 	private void checkTimeouts()
@@ -570,6 +608,10 @@ public class Node implements EventTarget
 			case ALLOCATE_TOKENS:
 			allocateTokens();
 			break;
+			
+			case SEND_SEARCH:
+			sendSearch();
+			break;
 		}
 	}
 	
@@ -580,4 +622,5 @@ public class Node implements EventTarget
 	public final static int SSK_COLLISION = 5;
 	private final static int CHECK_TIMEOUTS = 6;
 	private final static int ALLOCATE_TOKENS = 7;
+	private final static int SEND_SEARCH = 8;
 }

@@ -134,7 +134,6 @@ public abstract class MessageHandler
 	protected void handleRouteNotFound (RouteNotFound rnf)
 	{
 		if (searchState != ACCEPTED) node.log (rnf + " out of order");
-		next.successNotOverload(); // Reset the backoff length
 		// Use the remaining htl to try another peer
 		if (rnf.htl < htl) htl = rnf.htl;
 		forwardSearch();

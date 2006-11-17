@@ -29,7 +29,6 @@ public abstract class RequestHandler extends MessageHandler
 	protected void handleDataNotFound (DataNotFound dnf)
 	{
 		if (searchState != ACCEPTED) node.log (dnf + " out of order");
-		next.successNotOverload(); // Reset the backoff length
 		if (prev == null) node.log (this + " failed");
 		else prev.sendMessage (dnf); // Forward the message
 		finish();

@@ -42,7 +42,6 @@ public class SskRequestHandler extends RequestHandler
 	private void handleSskDataFound (SskDataFound df)
 	{
 		if (searchState != ACCEPTED) node.log (df + " out of order");
-		next.successNotOverload(); // Reset the backoff length
 		dataFound = df;
 		if (pubKey == null) return; // Keep waiting
 		if (prev == null) node.searchSucceeded (this);
@@ -58,7 +57,6 @@ public class SskRequestHandler extends RequestHandler
 	private void handleSskPubKey (SskPubKey pk)
 	{
 		if (searchState != ACCEPTED) node.log (pk + " out of order");
-		next.successNotOverload(); // Reset the backoff length
 		pubKey = pk;
 		if (dataFound == null) return; // Keep waiting
 		if (prev == null) node.searchSucceeded (this);

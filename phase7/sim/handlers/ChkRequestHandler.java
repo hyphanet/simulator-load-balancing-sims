@@ -40,7 +40,6 @@ public class ChkRequestHandler extends RequestHandler
 	{
 		if (searchState != ACCEPTED) node.log (df + " out of order");
 		searchState = TRANSFERRING;
-		next.successNotOverload(); // Reset the backoff length
 		if (prev != null) prev.sendMessage (df); // Forward the message
 		// If we have all the blocks and the headers, cache the data
 		if (blocksReceived == 32) {

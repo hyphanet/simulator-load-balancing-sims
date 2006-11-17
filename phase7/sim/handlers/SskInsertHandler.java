@@ -82,6 +82,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (searchState != SENT) node.log (sa + " out of order");
 		searchState = ACCEPTED;
+		next.successNotOverload(); // Reset the backoff length
 		// Wait 60 seconds for a reply to the search
 		Event.schedule (this, 60.0, SEARCH_TIMEOUT, next);
 		// Send the public key if requested
@@ -91,7 +92,6 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void handleCollision (SskDataFound sdf)
 	{
 		if (searchState != ACCEPTED) node.log (sdf + " out of order");
-		// FIXME: should we reset the backoff length?
 		if (prev == null) node.log (this + " collided");
 		else prev.sendMessage (sdf); // Forward the message
 		data = sdf.data; // Is this safe?
@@ -100,7 +100,6 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void handleInsertReply (InsertReply ir)
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
-		next.successNotOverload(); // Reset the backoff length
 		if (prev == null) node.searchSucceeded (this);
 		else prev.sendMessage (ir); // Forward the message
 		finish();
