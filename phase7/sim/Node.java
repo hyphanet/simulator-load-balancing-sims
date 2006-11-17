@@ -491,7 +491,8 @@ public class Node implements EventTarget
 	private void addToSearchQueue (Search s)
 	{
 		searchQueue.add (s);
-		if (USE_THROTTLE && searchQueue.size() == 1) {
+		if (USE_THROTTLE) {
+			if (searchQueue.size() > 1) return; // Already waiting
 			double now = Event.time();
 			double then = searchThrottle.nextSearchTime (now);
 			Event.schedule (this, then - now, SEND_SEARCH, null);
