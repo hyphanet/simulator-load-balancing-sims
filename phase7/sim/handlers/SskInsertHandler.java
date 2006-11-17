@@ -101,14 +101,14 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
 		next.successNotOverload(); // Reset the backoff length
-		if (prev == null) node.log (this + " succeeded");
+		if (prev == null) node.searchSucceeded (this);
 		else prev.sendMessage (ir); // Forward the message
 		finish();
 	}
 	
 	protected void sendReply()
 	{
-		if (prev == null) node.log (this + " succeeded");
+		if (prev == null) node.searchSucceeded (this);
 		else prev.sendMessage (new InsertReply (id));
 	}
 	

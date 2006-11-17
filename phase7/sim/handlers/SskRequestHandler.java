@@ -45,7 +45,7 @@ public class SskRequestHandler extends RequestHandler
 		next.successNotOverload(); // Reset the backoff length
 		dataFound = df;
 		if (pubKey == null) return; // Keep waiting
-		if (prev == null) node.log (this + " succeeded");
+		if (prev == null) node.searchSucceeded (this);
 		else {
 			prev.sendMessage (dataFound);
 			if (needPubKey) prev.sendMessage (pubKey);
@@ -61,7 +61,7 @@ public class SskRequestHandler extends RequestHandler
 		next.successNotOverload(); // Reset the backoff length
 		pubKey = pk;
 		if (dataFound == null) return; // Keep waiting
-		if (prev == null) node.log (this + " succeeded");
+		if (prev == null) node.searchSucceeded (this);
 		else {
 			prev.sendMessage (dataFound);
 			if (needPubKey) prev.sendMessage (pubKey);

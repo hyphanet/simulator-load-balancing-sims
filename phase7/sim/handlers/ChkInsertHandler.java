@@ -64,7 +64,10 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Start the search
 		forwardSearch();
 		// If we have all the blocks and the headers, consider finishing
-		if (blocksReceived == 32) finish();
+		if (blocksReceived == 32) {
+			inState = COMPLETED;
+			considerFinishing();
+		}
 		// Wait for transfer to complete (FIXME: check real timeout)
 		else Event.schedule (this, 120.0, TRANSFER_IN_TIMEOUT, null);
 	}
@@ -78,14 +81,16 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		// Forward the block to all receivers
 		for (Peer p : receivers) p.sendMessage (b);
 		// If we have all the blocks and the headers, consider finishing
-		if (blocksReceived == 32 && inState == TRANSFERRING) finish();
+		if (blocksReceived == 32 && inState == TRANSFERRING) {
+			inState = COMPLETED;
+			considerFinishing();
+		}
 	}
 	
 	private void handleCompleted (TransfersCompleted tc, Peer src)
 	{
 		receivers.remove (src);
-		if (searchState == COMPLETED && inState == COMPLETED 
-		&& receivers.isEmpty()) reallyFinish();
+		considerFinishing();
 	}
 	
 	private void handleAccepted (Accepted a)
@@ -109,14 +114,14 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
 		next.successNotOverload(); // Reset the backoff length
-		if (prev == null) node.log (this + " succeeded");
+		if (prev == null) node.searchSucceeded (this);
 		else prev.sendMessage (ir); // Forward the message
 		finish();
 	}
 
 	protected void sendReply()
 	{
-		if (prev == null) node.log (this + " succeeded");
+		if (prev == null) node.searchSucceeded (this);
 		else prev.sendMessage (new InsertReply (id));
 	}
 	
@@ -149,6 +154,12 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		node.removeMessageHandler (id);
 	}
 	
+	private void considerFinishing()
+	{
+		if (inState == COMPLETED && searchState == COMPLETED
+		&& receivers.isEmpty()) reallyFinish();
+	}
+	
 	public String toString()
 	{
 		return new String ("CHK insert (" + id + "," + key + ")");
@@ -159,7 +170,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (inState != STARTED) return;
 		node.log (this + " data timeout from " + prev);
-		if (prev == null) node.log (this + " failed");
+		if (prev == null) node.log (this + " failed"); // Don't throttle
 		else prev.sendMessage (new TransfersCompleted (id));
 		reallyFinish();
 	}
@@ -169,7 +180,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (inState != TRANSFERRING) return;
 		node.log (this + " transfer timeout from " + prev);
-		if (prev == null) node.log (this + " failed");
+		if (prev == null) node.log (this + " failed"); // Don't throttle
 		else prev.sendMessage (new TransfersCompleted (id));
 		reallyFinish();
 	}
@@ -180,8 +191,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		if (!receivers.remove (p)) return;
 		node.log (this + " transfer timeout to " + p);
 		// FIXME: should we back off?
-		if (searchState == COMPLETED && inState == COMPLETED 
-		&& receivers.isEmpty()) reallyFinish();
+		considerFinishing();
 	}
 	
 	// EventTarget interface

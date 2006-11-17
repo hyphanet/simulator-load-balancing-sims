@@ -120,7 +120,7 @@ public class Node implements EventTarget
 	}
 	
 	// Return true if the node appears to be overloaded
-	private boolean shouldRejectRequest()
+	private boolean shouldRejectSearch()
 	{
 		if (delay > MAX_DELAY) return true;
 		if (delay > HIGH_DELAY) {
@@ -133,9 +133,10 @@ public class Node implements EventTarget
 	// Reject a request or insert if the node appears to be overloaded
 	private boolean rejectIfOverloaded (Peer prev, int id)
 	{
-		if (shouldRejectRequest()) {
+		if (shouldRejectSearch()) {
 			if (prev == null) {
-				// FIXME: throttle
+				// FIXME
+				log ("rejecting local search " + id);
 			}
 			else prev.sendMessage (new RejectedOverload (id, true));
 			return true;
@@ -413,6 +414,17 @@ public class Node implements EventTarget
 		SskInsertHandler ih = new SskInsertHandler (i,this,prev,!pub);
 		messageHandlers.put (i.id, ih);
 		ih.start();
+	}
+	
+	public void searchSucceeded (MessageHandler m)
+	{
+		// FIXME: increase the rate of the relevant throttle
+		log (m + " succeeded");
+	}
+	
+	public void reduceSearchRate (MessageHandler m)
+	{
+		// FIXME: reduce the rate of the relevant throttle
 	}
 	
 	public void removeMessageHandler (int id)

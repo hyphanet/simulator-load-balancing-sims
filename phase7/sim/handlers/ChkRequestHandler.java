@@ -45,7 +45,7 @@ public class ChkRequestHandler extends RequestHandler
 		// If we have all the blocks and the headers, cache the data
 		if (blocksReceived == 32) {
 			node.cacheChk (key);
-			if (prev == null) node.log (this + " succeeded");
+			if (prev == null) node.searchSucceeded (this);
 			finish();
 		}
 		// Wait for the transfer to complete (FIXME: check real timeout)
@@ -66,7 +66,7 @@ public class ChkRequestHandler extends RequestHandler
 		// If we have all the blocks and the headers, cache the data
 		if (blocksReceived == 32 && searchState == TRANSFERRING) {
 			node.cacheChk (key);
-			if (prev == null) node.log (this + " succeeded");
+			if (prev == null) node.searchSucceeded (this);
 			finish();
 		}
 	}
