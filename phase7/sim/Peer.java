@@ -24,7 +24,7 @@ public class Peer implements EventTarget
 	// Backoff
 	public final static double INITIAL_BACKOFF = 1.0; // Seconds
 	public final static double BACKOFF_MULTIPLIER = 2.0;
-	public final static double MAX_BACKOFF = 10800000.0; // Three hours!?
+	public final static double MAX_BACKOFF = 10800.0; // Three hours!?
 	
 	// Out-of-order delivery with duplicate detection
 	public final static int SEQ_RANGE = 65536;
@@ -253,6 +253,7 @@ public class Peer implements EventTarget
 	// When a local RejectedOverload is received, back off unless backed off
 	public void localRejectedOverload()
 	{
+		if (!Node.USE_BACKOFF) return;
 		double now = Event.time();
 		if (now < backoffUntil) return; // Already backed off
 		backoffLength *= BACKOFF_MULTIPLIER;
@@ -264,6 +265,7 @@ public class Peer implements EventTarget
 	// When a search is accepted, reset the backoff length unless backed off
 	public void successNotOverload()
 	{
+		if (!Node.USE_BACKOFF) return;
 		if (Event.time() < backoffUntil) return;
 		backoffLength = INITIAL_BACKOFF;
 		log ("resetting backoff length");

@@ -78,7 +78,7 @@ public abstract class MessageHandler
 			htl = node.decrementHtl (htl);
 		node.log (this + " has htl " + htl);
 		// Consume a token
-		next.tokensOut--;
+		if (Node.USE_TOKENS) next.tokensOut--;
 		// Forward the search
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
@@ -96,11 +96,11 @@ public abstract class MessageHandler
 		double closestDist = Double.POSITIVE_INFINITY;
 		Peer closestPeer = null;
 		for (Peer peer : nexts) {
-			if (peer.tokensOut == 0) {
+			if (Node.USE_TOKENS && peer.tokensOut == 0) {
 				node.log ("bypassing busy peer " + peer);
 				continue;
 			}
-			if (now < peer.backoffUntil) {
+			if (Node.USE_BACKOFF && now < peer.backoffUntil) {
 				node.log ("bypassing backed off peer " + peer);
 				continue;
 			}
@@ -117,7 +117,6 @@ public abstract class MessageHandler
 	{
 		if (searchState != SENT) node.log (rl + " out of order");
 		next.successNotOverload(); // Reset the backoff length
-		next.tokensOut++; // No token was consumed
 		forwardSearch();
 	}
 	

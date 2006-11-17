@@ -12,9 +12,13 @@ public class Node implements EventTarget
 	public final static double RETX_TIMER = 0.1; // Seconds
 	
 	// Flow control
+	public final static boolean USE_TOKENS = false;
+	public final static boolean USE_BACKOFF = false;
 	public final static int FLOW_TOKENS = 20; // Shared by all peers
 	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
 	public final static double DELAY_DECAY = 0.99; // Exp moving average
+	public final static double MAX_DELAY = 2.0; // Reject all, seconds
+	public final static double HIGH_DELAY = 1.0; // Reject some, seconds
 	
 	public double location; // Routing location
 	public NetworkInterface net;
@@ -56,7 +60,8 @@ public class Node implements EventTarget
 		if (Math.random() < 0.25) decrementMinHtl = true;
 		bandwidth = new TokenBucket (40000, 60000);
 		// Allocate flow control tokens after a short delay
-		Event.schedule (this, Math.random(), ALLOCATE_TOKENS, null);
+		if (USE_TOKENS) Event.schedule (this, Math.random() * 0.1,
+						ALLOCATE_TOKENS, null);
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -112,6 +117,44 @@ public class Node implements EventTarget
 		if ((htl == Search.MAX_HTL && !decrementMaxHtl)
 		|| (htl == 1 && !decrementMinHtl)) return htl;
 		else return htl - 1;
+	}
+	
+	// Return true if the node appears to be overloaded
+	private boolean shouldRejectRequest()
+	{
+		if (delay > MAX_DELAY) return true;
+		if (delay > HIGH_DELAY) {
+			double p = (delay-HIGH_DELAY) / (MAX_DELAY-HIGH_DELAY);
+			if (Math.random() < p) return true;
+		}
+		return false;
+	}
+	
+	// Reject a request or insert if the node appears to be overloaded
+	private boolean rejectIfOverloaded (Peer prev, int id)
+	{
+		if (shouldRejectRequest()) {
+			if (prev == null) {
+				// FIXME: throttle
+			}
+			else prev.sendMessage (new RejectedOverload (id, true));
+			return true;
+		}
+		return false;
+	}
+	
+	// Reject a request or insert if its search ID has already been seen
+	private boolean rejectIfRecentlySeen (Peer prev, int id)
+	{
+		if (recentlySeenRequests.add (id)) return false;
+		
+		log ("rejecting recently seen search " + id);
+		prev.sendMessage (new RejectedLoop (id));
+		if (USE_TOKENS) allocateToken (prev);
+		// Don't forward the same search back to prev
+		MessageHandler mh = messageHandlers.get (id);
+		if (mh != null) mh.removeNextHop (prev);
+		return true;
 	}
 	
 	// Add a CHK to the cache
@@ -246,16 +289,9 @@ public class Node implements EventTarget
 	
 	private void handleChkRequest (ChkRequest r, Peer prev)
 	{
-		// FIXME: reject if overloaded
-		if (!recentlySeenRequests.add (r.id)) {
-			log ("rejecting recently seen " + r);
-			prev.sendMessage (new RejectedLoop (r.id));
-			// Don't forward the same search back to prev
-			MessageHandler mh = messageHandlers.get (r.id);
-			if (mh != null) mh.removeNextHop (prev);
-			return;
-		}
-		if (!getToken (prev)) return;
+		if (USE_BACKOFF && rejectIfOverloaded (prev, r.id)) return;
+		if (USE_TOKENS && !getToken (prev)) return;
+		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Accept the search
 		if (prev != null) {
 			log ("accepting " + r);
@@ -270,7 +306,7 @@ public class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
-			allocateToken (prev);
+			if (USE_TOKENS) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in CHK store");
@@ -283,7 +319,7 @@ public class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
-			allocateToken (prev);
+			if (USE_TOKENS) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in CHK cache");
@@ -295,16 +331,9 @@ public class Node implements EventTarget
 	
 	private void handleChkInsert (ChkInsert i, Peer prev)
 	{
-		// FIXME: reject if overloaded
-		if (!recentlySeenRequests.add (i.id)) {
-			log ("rejecting recently seen " + i);
-			prev.sendMessage (new RejectedLoop (i.id));
-			// Don't forward the same search back to prev
-			MessageHandler mh = messageHandlers.get (i.id);
-			if (mh != null) mh.removeNextHop (prev);
-			return;
-		}
-		if (!getToken (prev)) return;
+		if (USE_BACKOFF && rejectIfOverloaded (prev, i.id)) return;
+		if (USE_TOKENS && !getToken (prev)) return;
+		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Accept the search
 		if (prev != null) {
 			log ("accepting " + i);
@@ -318,16 +347,9 @@ public class Node implements EventTarget
 	
 	private void handleSskRequest (SskRequest r, Peer prev)
 	{
-		// FIXME: reject if overloaded
-		if (!recentlySeenRequests.add (r.id)) {
-			log ("rejecting recently seen " + r);
-			prev.sendMessage (new RejectedLoop (r.id));
-			// Don't forward the same search back to prev
-			MessageHandler mh = messageHandlers.get (r.id);
-			if (mh != null) mh.removeNextHop (prev);
-			return;
-		}
-		if (!getToken (prev)) return;
+		if (USE_BACKOFF && rejectIfOverloaded (prev, r.id)) return;
+		if (USE_TOKENS && !getToken (prev)) return;
+		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Look up the public key
 		boolean pub = pubKeyStore.get (r.key) || pubKeyCache.get(r.key);
 		if (pub) log ("public key " + r.key + " found in cache");
@@ -348,7 +370,7 @@ public class Node implements EventTarget
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
 			}
-			allocateToken (prev);
+			if (USE_TOKENS) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in SSK store");
@@ -363,7 +385,7 @@ public class Node implements EventTarget
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
 			}
-			allocateToken (prev);
+			if (USE_TOKENS) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in SSK cache");
@@ -375,16 +397,9 @@ public class Node implements EventTarget
 	
 	private void handleSskInsert (SskInsert i, Peer prev)
 	{
-		// FIXME: reject if overloaded
-		if (!recentlySeenRequests.add (i.id)) {
-			log ("rejecting recently seen " + i);
-			prev.sendMessage (new RejectedLoop (i.id));
-			// Don't forward the same search back to prev
-			MessageHandler mh = messageHandlers.get (i.id);
-			if (mh != null) mh.removeNextHop (prev);
-			return;
-		}
-		if (!getToken (prev)) return;
+		if (USE_BACKOFF && rejectIfOverloaded (prev, i.id)) return;
+		if (USE_TOKENS && !getToken (prev)) return;
+		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Look up the public key
 		boolean pub = pubKeyStore.get (i.key) || pubKeyCache.get(i.key);
 		if (pub) log ("public key " + i.key + " found in cache");
@@ -406,7 +421,7 @@ public class Node implements EventTarget
 		if (mh == null) log ("no message handler to remove for " + id);
 		else {
 			log ("removing message handler for " + id);
-			allocateToken (mh.prev);
+			if (USE_TOKENS) allocateToken (mh.prev);
 		}
 	}
 	
