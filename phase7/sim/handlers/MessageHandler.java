@@ -121,14 +121,12 @@ public abstract class MessageHandler
 		forwardSearch();
 	}
 	
-	protected void handleRejectedOverload (RejectedOverload ro)
+	protected void handleOverload (RejectedOverload ro, Peer src)
 	{
-		if (searchState != SENT) node.log (ro + " out of order");
 		if (ro.local) {
 			ro.local = false;
-			// Back off and try another peer
-			next.localRejectedOverload();
-			forwardSearch();
+			src.localRejectedOverload(); // Back off
+			if (src == next) forwardSearch(); // Try another peer
 		}
 		if (prev == null) {
 			// FIXME: throttle

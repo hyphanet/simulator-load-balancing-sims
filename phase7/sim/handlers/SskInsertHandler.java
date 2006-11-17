@@ -47,7 +47,9 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	public void handleMessage (Message m, Peer src)
 	{
-		if (src == prev) {
+		if (m instanceof RejectedOverload)
+			handleOverload ((RejectedOverload) m, src);
+		else if (src == prev) {
 			if (m instanceof SskPubKey)
 				handleSskPubKey ((SskPubKey) m);
 			else node.log ("unexpected type for " + m);
@@ -57,8 +59,6 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 				handleSskAccepted ((SskAccepted) m);
 			else if (m instanceof RejectedLoop)
 				handleRejectedLoop ((RejectedLoop) m);
-			else if (m instanceof RejectedOverload)
-				handleRejectedOverload ((RejectedOverload) m);
 			else if (m instanceof RouteNotFound)
 				handleRouteNotFound ((RouteNotFound) m);
 			else if (m instanceof SskDataFound)

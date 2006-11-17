@@ -27,7 +27,9 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	
 	public void handleMessage (Message m, Peer src)
 	{
-		if (src == prev) {
+		if (m instanceof RejectedOverload)
+			handleOverload ((RejectedOverload) m, src);
+		else if (src == prev) {
 			if (m instanceof DataInsert)
 				handleDataInsert ((DataInsert) m);
 			else if (m instanceof Block)
@@ -39,8 +41,6 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 				handleAccepted ((Accepted) m);
 			else if (m instanceof RejectedLoop)
 				handleRejectedLoop ((RejectedLoop) m);
-			else if (m instanceof RejectedOverload)
-				handleRejectedOverload ((RejectedOverload) m);
 			else if (m instanceof RouteNotFound)
 				handleRouteNotFound ((RouteNotFound) m);
 			else if (m instanceof InsertReply)
