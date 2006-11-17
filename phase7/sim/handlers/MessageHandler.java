@@ -66,7 +66,7 @@ public abstract class MessageHandler
 		next = closestPeer();
 		if (next == null) {
 			node.log ("route not found for " + this);
-			if (prev == null) node.log (this + " failed");
+			if (prev == null) node.log (this + " failed (rnf)");
 			else prev.sendMessage (new RouteNotFound (id, htl));
 			finish();
 			return;
@@ -163,7 +163,7 @@ public abstract class MessageHandler
 		// Tell the sender to slow down
 		if (prev == null) node.reduceSearchRate (this);
 		else prev.sendMessage (new RejectedOverload (id, false));
-		if (prev == null) node.log (this + " failed");
+		if (prev == null) node.log (this + " failed (search)");
 		finish();
 	}
 	

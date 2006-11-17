@@ -29,14 +29,14 @@ public abstract class RequestHandler extends MessageHandler
 	protected void handleDataNotFound (DataNotFound dnf)
 	{
 		if (searchState != ACCEPTED) node.log (dnf + " out of order");
-		if (prev == null) node.log (this + " failed");
+		if (prev == null) node.log (this + " failed (dnf)");
 		else prev.sendMessage (dnf); // Forward the message
 		finish();
 	}
 	
 	protected void sendReply()
 	{
-		if (prev == null) node.log (this + " failed");
+		if (prev == null) node.log (this + " failed (dnf)");
 		else prev.sendMessage (new DataNotFound (id));
 	}
 	
@@ -56,7 +56,7 @@ public abstract class RequestHandler extends MessageHandler
 	{
 		if (searchState != TRANSFERRING) return;
 		node.log (this + " transfer timeout from " + p);
-		if (prev == null) node.log (this + " failed");
+		if (prev == null) node.log (this + " failed (xfer)");
 		finish();
 	}
 	

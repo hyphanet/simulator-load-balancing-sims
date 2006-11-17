@@ -169,7 +169,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (inState != STARTED) return;
 		node.log (this + " data timeout from " + prev);
-		if (prev == null) node.log (this + " failed"); // Don't throttle
+		if (prev == null) node.log (this + " failed (xfer start)");
 		else prev.sendMessage (new TransfersCompleted (id));
 		reallyFinish();
 	}
@@ -179,7 +179,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (inState != TRANSFERRING) return;
 		node.log (this + " transfer timeout from " + prev);
-		if (prev == null) node.log (this + " failed"); // Don't throttle
+		if (prev == null) node.log (this + " failed (xfer end)");
 		else prev.sendMessage (new TransfersCompleted (id));
 		reallyFinish();
 	}
