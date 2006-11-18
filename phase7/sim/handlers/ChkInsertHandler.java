@@ -11,7 +11,6 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private HashSet<Peer> receivers; // Peers that should receive data
 	private Block[] blocks; // Store incoming blocks for forwarding
 	private int blocksReceived = 0;
-	private boolean transferred = false; // Did we send the data to anyone?
 	
 	public ChkInsertHandler (ChkInsert i, Node node, Peer prev)
 	{
@@ -91,7 +90,6 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void handleCompleted (TransfersCompleted tc, Peer src)
 	{
 		receivers.remove (src);
-		transferred = true;
 		considerFinishing();
 	}
 	
@@ -115,7 +113,10 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void handleInsertReply (InsertReply ir)
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
-		if (prev == null) node.increaseSearchRate();
+		if (prev == null) {
+			node.log (this + " succeeded");
+			node.increaseSearchRate();
+		}
 		else prev.sendMessage (ir); // Forward the message
 		finish();
 	}
@@ -146,14 +147,11 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	
 	private void reallyFinish()
 	{
-		inState = COMPLETED;
 		searchState = COMPLETED;
+		inState = COMPLETED;
 		node.cacheChk (key);
 		node.storeChk (key);
-		if (prev == null) {
-			if (transferred) node.log (this + " succeeded");
-			else node.log (this + " failed (no xfers)");
-		}
+		if (prev == null) node.log (this + " completed");
 		else prev.sendMessage (new TransfersCompleted (id));
 		node.removeMessageHandler (id);
 	}
@@ -169,25 +167,12 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		return new String ("CHK insert (" + id + "," + key + ")");
 	}
 	
-	// Overrides MessageHandler.searchTimeout() to suppress failure message
-	protected void searchTimeout (Peer p)
-	{
-		if (p != next) return; // We've already moved on to another peer
-		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout for " + p);
-		p.localRejectedOverload(); // Back off from p
-		// Tell the sender to slow down
-		if (prev == null) node.decreaseSearchRate(); // Don't fail yet
-		else prev.sendMessage (new RejectedOverload (id, false));
-		finish();
-	}
-	
 	// Event callback
 	private void dataTimeout()
 	{
 		if (inState != STARTED) return;
 		node.log (this + " data timeout from " + prev);
-		if (prev != null) prev.sendMessage (new TransfersCompleted(id));
+		prev.sendMessage (new TransfersCompleted(id));
 		reallyFinish();
 	}
 	
@@ -196,7 +181,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	{
 		if (inState != TRANSFERRING) return;
 		node.log (this + " transfer timeout from " + prev);
-		if (prev != null) prev.sendMessage (new TransfersCompleted(id));
+		prev.sendMessage (new TransfersCompleted(id));
 		reallyFinish();
 	}
 	
