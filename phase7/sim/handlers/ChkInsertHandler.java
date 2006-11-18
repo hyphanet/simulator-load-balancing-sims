@@ -123,7 +123,10 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 
 	protected void sendReply()
 	{
-		if (prev == null) node.increaseSearchRate();
+		if (prev == null) {
+			node.log (this + " succeeded");
+			node.increaseSearchRate();
+		}
 		else prev.sendMessage (new InsertReply (id));
 	}
 	
