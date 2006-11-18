@@ -420,13 +420,12 @@ public class Node implements EventTarget
 		ih.start();
 	}
 	
-	public void searchSucceeded (MessageHandler m)
+	public void increaseSearchRate()
 	{
-		log (m + " succeeded");
 		if (USE_THROTTLE) searchThrottle.increaseRate();
 	}
 	
-	public void reduceSearchRate (MessageHandler m)
+	public void decreaseSearchRate()
 	{
 		if (USE_THROTTLE) searchThrottle.decreaseRate();
 	}

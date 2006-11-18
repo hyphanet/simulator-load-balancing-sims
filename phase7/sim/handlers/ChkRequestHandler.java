@@ -24,7 +24,7 @@ public class ChkRequestHandler extends RequestHandler
 		else if (m instanceof RejectedLoop)
 			handleRejectedLoop ((RejectedLoop) m);
 		else if (m instanceof RejectedOverload)
-			handleOverload ((RejectedOverload) m, src);
+			handleRejectedOverload ((RejectedOverload) m);
 		else if (m instanceof RouteNotFound)
 			handleRouteNotFound ((RouteNotFound) m);
 		else if (m instanceof DataNotFound)
@@ -44,7 +44,10 @@ public class ChkRequestHandler extends RequestHandler
 		// If we have all the blocks and the headers, cache the data
 		if (blocksReceived == 32) {
 			node.cacheChk (key);
-			if (prev == null) node.searchSucceeded (this);
+			if (prev == null) {
+				node.log (this + "succeeded");
+				node.increaseSearchRate();
+			}
 			finish();
 		}
 		// Wait for the transfer to complete (FIXME: check real timeout)
@@ -65,7 +68,10 @@ public class ChkRequestHandler extends RequestHandler
 		// If we have all the blocks and the headers, cache the data
 		if (blocksReceived == 32 && searchState == TRANSFERRING) {
 			node.cacheChk (key);
-			if (prev == null) node.searchSucceeded (this);
+			if (prev == null) {
+				node.log (this + " succeeded");
+				node.increaseSearchRate();
+			}
 			finish();
 		}
 	}

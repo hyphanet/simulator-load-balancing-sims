@@ -120,14 +120,15 @@ public abstract class MessageHandler
 		forwardSearch();
 	}
 	
-	protected void handleOverload (RejectedOverload ro, Peer src)
+	protected void handleRejectedOverload (RejectedOverload ro)
 	{
 		if (ro.local) {
 			ro.local = false;
-			src.localRejectedOverload(); // Back off
-			if (src == next) forwardSearch(); // Try another peer
+			next.localRejectedOverload(); // Back off
+			forwardSearch(); // Try another peer
 		}
-		if (prev == null) node.reduceSearchRate (this);
+		// Tell the sender to slow down
+		if (prev == null) node.decreaseSearchRate();
 		else prev.sendMessage (ro); // Forward the message
 	}
 	
@@ -147,7 +148,7 @@ public abstract class MessageHandler
 		node.log (this + " accepted timeout for " + p);
 		p.localRejectedOverload(); // Back off from p
 		// Tell the sender to slow down
-		if (prev == null) node.reduceSearchRate (this);
+		if (prev == null) node.decreaseSearchRate();
 		else prev.sendMessage (new RejectedOverload (id, false));
 		// Try another peer
 		forwardSearch();
@@ -161,9 +162,11 @@ public abstract class MessageHandler
 		node.log (this + " search timeout for " + p);
 		p.localRejectedOverload(); // Back off from p
 		// Tell the sender to slow down
-		if (prev == null) node.reduceSearchRate (this);
+		if (prev == null) {
+			node.log (this + " failed (search)");
+			node.decreaseSearchRate();
+		}
 		else prev.sendMessage (new RejectedOverload (id, false));
-		if (prev == null) node.log (this + " failed (search)");
 		finish();
 	}
 	

@@ -57,7 +57,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 			else if (m instanceof RejectedLoop)
 				handleRejectedLoop ((RejectedLoop) m);
 			else if (m instanceof RejectedOverload)
-				handleOverload ((RejectedOverload) m, src);
+				handleRejectedOverload ((RejectedOverload) m);
 			else if (m instanceof RouteNotFound)
 				handleRouteNotFound ((RouteNotFound) m);
 			else if (m instanceof SskDataFound)
@@ -99,14 +99,20 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void handleInsertReply (InsertReply ir)
 	{
 		if (searchState != ACCEPTED) node.log (ir + " out of order");
-		if (prev == null) node.searchSucceeded (this);
+		if (prev == null) {
+			node.log (this + " succeeded");
+			node.increaseSearchRate();
+		}
 		else prev.sendMessage (ir); // Forward the message
 		finish();
 	}
 	
 	protected void sendReply()
 	{
-		if (prev == null) node.searchSucceeded (this);
+		if (prev == null) {
+			node.log (this + " succeeded");
+			node.increaseSearchRate();
+		}
 		else prev.sendMessage (new InsertReply (id));
 	}
 	
