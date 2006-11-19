@@ -294,7 +294,8 @@ public class Node implements EventTarget
 	
 	private void handleChkRequest (ChkRequest r, Peer prev)
 	{
-		if (USE_BACKOFF && rejectIfOverloaded (prev, r.id)) return;
+		if ((USE_BACKOFF || USE_THROTTLE)
+		&& rejectIfOverloaded (prev, r.id)) return;
 		if (USE_TOKENS && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Accept the search
@@ -336,7 +337,8 @@ public class Node implements EventTarget
 	
 	private void handleChkInsert (ChkInsert i, Peer prev)
 	{
-		if (USE_BACKOFF && rejectIfOverloaded (prev, i.id)) return;
+		if ((USE_BACKOFF || USE_THROTTLE)
+		&& rejectIfOverloaded (prev, i.id)) return;
 		if (USE_TOKENS && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Accept the search
@@ -352,7 +354,8 @@ public class Node implements EventTarget
 	
 	private void handleSskRequest (SskRequest r, Peer prev)
 	{
-		if (USE_BACKOFF && rejectIfOverloaded (prev, r.id)) return;
+		if ((USE_BACKOFF || USE_THROTTLE)
+		&& rejectIfOverloaded (prev, r.id)) return;
 		if (USE_TOKENS && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Look up the public key
@@ -402,7 +405,8 @@ public class Node implements EventTarget
 	
 	private void handleSskInsert (SskInsert i, Peer prev)
 	{
-		if (USE_BACKOFF && rejectIfOverloaded (prev, i.id)) return;
+		if ((USE_BACKOFF || USE_THROTTLE)
+		&& rejectIfOverloaded (prev, i.id)) return;
 		if (USE_TOKENS && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Look up the public key

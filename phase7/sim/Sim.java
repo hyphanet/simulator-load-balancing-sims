@@ -7,7 +7,6 @@ class Sim
 	private final int DEGREE = 5; // Average degree
 	private final double SPEED = 15000; // Network speed, bytes per second
 	private final double LATENCY = 0.1; // Latency of all links in seconds
-	private final int INSERTS = 100; // Number of inserts per publisher
 	private Node[] nodes;
 	
 	public Sim (double rate)
@@ -24,7 +23,7 @@ class Sim
 		// One in ten nodes is a publisher, each with ten readers
 		for (int i = 0; i < NODES; i += 10) {
 			SimplePublisher pub
-				= new SimplePublisher (rate, INSERTS, nodes[i]);
+				= new SimplePublisher (rate, 0, nodes[i]);
 			int readers = 0;
 			while (readers < 10) {
 				int index = (int) (Math.random() * NODES);
@@ -33,6 +32,8 @@ class Sim
 			}
 		}
 		// Run the simulation
+		Event.startLogging = 3600.0;
+		Event.duration = 7200.0;
 		Event.run();
 	}
 	

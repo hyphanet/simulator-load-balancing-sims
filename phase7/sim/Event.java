@@ -9,6 +9,7 @@ public class Event implements Comparable
 	private static double now = 0.0;
 	private static double lastLogTime = Double.POSITIVE_INFINITY;
 	private static int nextId = 0;
+	public static double startLogging = 0.0;
 	public static double duration = Double.POSITIVE_INFINITY;
 	
 	public static void reset()
@@ -52,6 +53,7 @@ public class Event implements Comparable
 	
 	public static void log (String message)
 	{
+		if (now < startLogging) return;
 		// Print a blank line between events
 		if (now > lastLogTime) System.out.println();
 		lastLogTime = now;
