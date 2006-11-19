@@ -66,7 +66,10 @@ public abstract class MessageHandler
 		next = closestPeer();
 		if (next == null) {
 			node.log ("route not found for " + this);
-			if (prev == null) node.log (this + " succeeded (rnf)");
+			if (prev == null) {
+				node.log (this + " succeeded (rnf)");
+				node.increaseSearchRate();
+			}
 			else prev.sendMessage (new RouteNotFound (id, htl));
 			finish();
 			return;
