@@ -1,0 +1,5 @@
+#!/usr/bin/perl
+while (<STDIN>) {
+	split ' ';
+	print unless ($_[0] < $ARGV[0]);
+}

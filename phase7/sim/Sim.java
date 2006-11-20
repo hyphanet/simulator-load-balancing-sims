@@ -32,7 +32,6 @@ class Sim
 			}
 		}
 		// Run the simulation
-		Event.startLogging = 3600.0; // Settling time
 		Event.duration = 10800.0;
 		Event.run();
 	}

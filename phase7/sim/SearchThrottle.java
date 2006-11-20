@@ -1,4 +1,4 @@
-// An AIMD token bucket
+// An AIMD leaky bucket
 
 package sim;
 
@@ -11,8 +11,7 @@ public class SearchThrottle
 	public final static double BETA = 0.969; // AIMD decrease parameter
 	
 	private double rate = INITIAL_RATE;
-	private double tokens = INITIAL_RATE, size = INITIAL_RATE;
-	private double lastUpdated = 0.0; // Time
+	private double lastSent = Double.NEGATIVE_INFINITY; // Time
 	
 	public void increaseRate()
 	{
@@ -28,18 +27,14 @@ public class SearchThrottle
 		Event.log ("rate decreased to " + rate);
 	}
 	
-	// Return the time when the next search can be sent
-	public double nextSearchTime (double now)
+	// Return the time remaining until the next search can be sent
+	public double delay (double now)
 	{
-		tokens += (now - lastUpdated) * rate;
-		if (tokens > size) tokens = size;
-		lastUpdated = now;
-		if (tokens >= 1.0) return now;
-		else return now + (1.0 - tokens) * rate;
+		return lastSent + 1.0 / rate - now;
 	}
 	
-	public void searchSent()
+	public void sent (double now)
 	{
-		tokens--;
+		lastSent = now;
 	}
 }

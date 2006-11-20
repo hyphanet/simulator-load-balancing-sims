@@ -100,11 +100,12 @@ public abstract class MessageHandler
 		Peer closestPeer = null;
 		for (Peer peer : nexts) {
 			if (Node.USE_TOKENS && peer.tokensOut == 0) {
-				node.log ("bypassing busy peer " + peer);
+				node.log ("no tokens for " + peer);
 				continue;
 			}
 			if (Node.USE_BACKOFF && now < peer.backoffUntil) {
-				node.log ("bypassing backed off peer " + peer);
+				node.log ("backed off from " + peer
+					+ " until " + peer.backoffUntil);
 				continue;
 			}
 			double dist = Node.distance (keyLoc, peer.location);

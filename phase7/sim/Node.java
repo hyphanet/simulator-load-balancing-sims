@@ -494,11 +494,16 @@ public class Node implements EventTarget
 	private void addToSearchQueue (Search s)
 	{
 		searchQueue.add (s);
+		log (searchQueue.size() + " searches in queue");
 		if (USE_THROTTLE) {
 			if (searchQueue.size() > 1) return; // Already waiting
 			double now = Event.time();
-			double then = searchThrottle.nextSearchTime (now);
-			Event.schedule (this, then - now, SEND_SEARCH, null);
+			double wait = searchThrottle.delay (now);
+			if (wait <= 0.0) sendSearch();
+			else {
+				log ("throttled for " + wait + " seconds");
+				Event.schedule (this, wait, SEND_SEARCH, null);
+			}
 		}
 		else sendSearch();
 	}
@@ -522,11 +527,12 @@ public class Node implements EventTarget
 			handleSskInsert ((SskInsert) s, null);
 		}
 		if (USE_THROTTLE) {
-			searchThrottle.searchSent();
-			if (searchQueue.isEmpty()) return;
 			double now = Event.time();
-			double then = searchThrottle.nextSearchTime (now);
-			Event.schedule (this, then - now, SEND_SEARCH, null);
+			searchThrottle.sent (now);
+			if (searchQueue.isEmpty()) return;
+			double wait = searchThrottle.delay (now);
+			log ("throttled for " + wait + " seconds");
+			Event.schedule (this, wait, SEND_SEARCH, null);
 		}
 	}
 	
