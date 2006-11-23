@@ -92,7 +92,15 @@ public abstract class MessageHandler
 	}
 	
 	// Find the closest remaining peer, if any
-	private Peer closestPeer ()
+	private Peer closestPeer()
+	{
+		Peer p = closestPeer (Node.USE_BACKOFF);
+		// If all peers are backed off, try again ignoring backoff
+		if (p == null && Node.USE_BACKOFF) return closestPeer (false);
+		else return p;
+	}
+	
+	private Peer closestPeer (boolean useBackoff)
 	{
 		double now = Event.time();
 		double keyLoc = Node.keyToLocation (key);
@@ -103,7 +111,7 @@ public abstract class MessageHandler
 				node.log ("no tokens for " + peer);
 				continue;
 			}
-			if (Node.USE_BACKOFF && now < peer.backoffUntil) {
+			if (useBackoff && now < peer.backoffUntil) {
 				node.log ("backed off from " + peer
 					+ " until " + peer.backoffUntil);
 				continue;

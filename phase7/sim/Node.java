@@ -15,7 +15,7 @@ public class Node implements EventTarget
 	// Flow control
 	public final static boolean USE_TOKENS = false;
 	public final static boolean USE_BACKOFF = true;
-	public final static boolean USE_THROTTLE = true;
+	public final static boolean USE_THROTTLE = false;
 	public final static int FLOW_TOKENS = 20; // Shared by all peers
 	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
 	public final static double DELAY_DECAY = 0.99; // Exp moving average
