@@ -81,7 +81,7 @@ public abstract class MessageHandler
 			htl = node.decrementHtl (htl);
 		node.log (this + " has htl " + htl);
 		// Consume a token
-		if (Node.USE_TOKENS) next.tokensOut--;
+		if (Node.useTokens) next.tokensOut--;
 		// Forward the search
 		node.log ("forwarding " + this + " to " + next.address);
 		next.sendMessage (makeSearchMessage());
@@ -94,9 +94,12 @@ public abstract class MessageHandler
 	// Find the closest remaining peer, if any
 	private Peer closestPeer()
 	{
-		Peer p = closestPeer (Node.USE_BACKOFF);
+		Peer p = closestPeer (Node.useBackoff);
 		// If all peers are backed off, try again ignoring backoff
-		if (p == null && Node.USE_BACKOFF) return closestPeer (false);
+		if (p == null && Node.useBackoff) {
+			node.log ("considering backed off peers");
+			return closestPeer (false);
+		}
 		else return p;
 	}
 	
@@ -107,7 +110,7 @@ public abstract class MessageHandler
 		double closestDist = Double.POSITIVE_INFINITY;
 		Peer closestPeer = null;
 		for (Peer peer : nexts) {
-			if (Node.USE_TOKENS && peer.tokensOut == 0) {
+			if (Node.useTokens && peer.tokensOut == 0) {
 				node.log ("no tokens for " + peer);
 				continue;
 			}

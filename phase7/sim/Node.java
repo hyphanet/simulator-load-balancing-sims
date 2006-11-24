@@ -13,9 +13,9 @@ public class Node implements EventTarget
 	public final static double RETX_TIMER = 0.1; // Seconds
 	
 	// Flow control
-	public final static boolean USE_TOKENS = false;
-	public final static boolean USE_BACKOFF = true;
-	public final static boolean USE_THROTTLE = false;
+	public static boolean useTokens = false;
+	public static boolean useBackoff = false;
+	public static boolean useThrottle = false;
 	public final static int FLOW_TOKENS = 20; // Shared by all peers
 	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
 	public final static double DELAY_DECAY = 0.99; // Exp moving average
@@ -64,10 +64,10 @@ public class Node implements EventTarget
 		if (Math.random() < 0.25) decrementMinHtl = true;
 		bandwidth = new TokenBucket (40000, 60000);
 		// Allocate flow control tokens after a short delay
-		if (USE_TOKENS) Event.schedule (this, Math.random() * 0.1,
+		if (useTokens) Event.schedule (this, Math.random() * 0.1,
 						ALLOCATE_TOKENS, null);
 		searchQueue = new LinkedList<Search>();
-		if (USE_THROTTLE) searchThrottle = new SearchThrottle();
+		if (useThrottle) searchThrottle = new SearchThrottle();
 	}
 	
 	// Return true if a connection was added, false if already connected
@@ -154,7 +154,7 @@ public class Node implements EventTarget
 		
 		log ("rejecting recently seen search " + id);
 		prev.sendMessage (new RejectedLoop (id));
-		if (USE_TOKENS) allocateToken (prev);
+		if (useTokens) allocateToken (prev);
 		// Don't forward the same search back to prev
 		MessageHandler mh = messageHandlers.get (id);
 		if (mh != null) mh.removeNextHop (prev);
@@ -294,9 +294,9 @@ public class Node implements EventTarget
 	
 	private void handleChkRequest (ChkRequest r, Peer prev)
 	{
-		if ((USE_BACKOFF || USE_THROTTLE)
+		if ((useBackoff || useThrottle)
 		&& rejectIfOverloaded (prev, r.id)) return;
-		if (USE_TOKENS && !getToken (prev)) return;
+		if (useTokens && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Accept the search
 		if (prev != null) {
@@ -312,7 +312,7 @@ public class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
-			if (USE_TOKENS) allocateToken (prev);
+			if (useTokens) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in CHK store");
@@ -325,7 +325,7 @@ public class Node implements EventTarget
 				for (int i = 0; i < 32; i++)
 					prev.sendMessage (new Block (r.id, i));
 			}
-			if (USE_TOKENS) allocateToken (prev);
+			if (useTokens) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in CHK cache");
@@ -337,9 +337,9 @@ public class Node implements EventTarget
 	
 	private void handleChkInsert (ChkInsert i, Peer prev)
 	{
-		if ((USE_BACKOFF || USE_THROTTLE)
+		if ((useBackoff || useThrottle)
 		&& rejectIfOverloaded (prev, i.id)) return;
-		if (USE_TOKENS && !getToken (prev)) return;
+		if (useTokens && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Accept the search
 		if (prev != null) {
@@ -354,9 +354,9 @@ public class Node implements EventTarget
 	
 	private void handleSskRequest (SskRequest r, Peer prev)
 	{
-		if ((USE_BACKOFF || USE_THROTTLE)
+		if ((useBackoff || useThrottle)
 		&& rejectIfOverloaded (prev, r.id)) return;
-		if (USE_TOKENS && !getToken (prev)) return;
+		if (useTokens && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Look up the public key
 		boolean pub = pubKeyStore.get (r.key) || pubKeyCache.get(r.key);
@@ -378,7 +378,7 @@ public class Node implements EventTarget
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
 			}
-			if (USE_TOKENS) allocateToken (prev);
+			if (useTokens) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in SSK store");
@@ -393,7 +393,7 @@ public class Node implements EventTarget
 					prev.sendMessage
 						(new SskPubKey (r.id, r.key));
 			}
-			if (USE_TOKENS) allocateToken (prev);
+			if (useTokens) allocateToken (prev);
 			return;
 		}
 		log ("key " + r.key + " not found in SSK cache");
@@ -405,9 +405,9 @@ public class Node implements EventTarget
 	
 	private void handleSskInsert (SskInsert i, Peer prev)
 	{
-		if ((USE_BACKOFF || USE_THROTTLE)
+		if ((useBackoff || useThrottle)
 		&& rejectIfOverloaded (prev, i.id)) return;
-		if (USE_TOKENS && !getToken (prev)) return;
+		if (useTokens && !getToken (prev)) return;
 		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Look up the public key
 		boolean pub = pubKeyStore.get (i.key) || pubKeyCache.get(i.key);
@@ -426,12 +426,12 @@ public class Node implements EventTarget
 	
 	public void increaseSearchRate()
 	{
-		if (USE_THROTTLE) searchThrottle.increaseRate();
+		if (useThrottle) searchThrottle.increaseRate();
 	}
 	
 	public void decreaseSearchRate()
 	{
-		if (USE_THROTTLE) searchThrottle.decreaseRate();
+		if (useThrottle) searchThrottle.decreaseRate();
 	}
 	
 	public void removeMessageHandler (int id)
@@ -440,7 +440,7 @@ public class Node implements EventTarget
 		if (mh == null) log ("no message handler to remove for " + id);
 		else {
 			log ("removing message handler for " + id);
-			if (USE_TOKENS) allocateToken (mh.prev);
+			if (useTokens) allocateToken (mh.prev);
 		}
 	}
 	
@@ -495,7 +495,7 @@ public class Node implements EventTarget
 	{
 		searchQueue.add (s);
 		log (searchQueue.size() + " searches in queue");
-		if (USE_THROTTLE) {
+		if (useThrottle) {
 			if (searchQueue.size() > 1) return; // Already waiting
 			double now = Event.time();
 			double wait = searchThrottle.delay (now);
@@ -526,7 +526,7 @@ public class Node implements EventTarget
 			pubKeyCache.put (s.key);
 			handleSskInsert ((SskInsert) s, null);
 		}
-		if (USE_THROTTLE) {
+		if (useThrottle) {
 			double now = Event.time();
 			searchThrottle.sent (now);
 			if (searchQueue.isEmpty()) return;

@@ -253,7 +253,7 @@ public class Peer implements EventTarget
 	// When a local RejectedOverload is received, back off unless backed off
 	public void localRejectedOverload()
 	{
-		if (!Node.USE_BACKOFF) return;
+		if (!Node.useBackoff) return;
 		double now = Event.time();
 		if (now < backoffUntil) return; // Already backed off
 		backoffLength *= BACKOFF_MULTIPLIER;
@@ -265,7 +265,7 @@ public class Peer implements EventTarget
 	// When a search is accepted, reset the backoff length unless backed off
 	public void successNotOverload()
 	{
-		if (!Node.USE_BACKOFF) return;
+		if (!Node.useBackoff) return;
 		if (Event.time() < backoffUntil) return;
 		backoffLength = INITIAL_BACKOFF;
 		log ("resetting backoff length");

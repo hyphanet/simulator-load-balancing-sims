@@ -65,11 +65,20 @@ class Sim
 		}
 	}
 	
+	private static void usage()
+	{
+		System.err.println ("Usage: Sim <load> <tokens> <backoff> <throttle>");
+		System.exit (1);
+	}
+	
 	public static void main (String[] args)
 	{
-		if (args.length != 1) System.exit (1);
-		double interval = Double.parseDouble (args[0]);
-		if (interval < 1.0) System.exit (1);
-		new Sim (1.0 / interval);
+		if (args.length != 4) usage();
+		double load = Double.parseDouble (args[0]);
+		Node.useTokens = Boolean.parseBoolean (args[1]);
+		Node.useBackoff = Boolean.parseBoolean (args[2]);
+		Node.useThrottle = Boolean.parseBoolean (args[3]);
+		if (load <= 0.0) usage();
+		new Sim (load / 60.0);
 	}
 }
