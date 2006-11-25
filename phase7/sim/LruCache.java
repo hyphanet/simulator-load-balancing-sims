@@ -5,6 +5,8 @@ import java.util.LinkedHashSet;
 
 class LruCache<Key>
 {
+	public final static boolean LOG = false;
+	
 	public final int capacity;
 	private LinkedHashSet<Key> set;
 	
@@ -16,7 +18,7 @@ class LruCache<Key>
 	
 	public boolean get (Key key)
 	{
-		log ("searching cache for key " + key);
+		if (LOG) log ("searching cache for key " + key);
 		if (set.remove (key)) {
 			set.add (key); // Move the key to the fresh end
 			return true;
@@ -26,14 +28,15 @@ class LruCache<Key>
 	
 	public void put (Key key)
 	{
-		if (set.remove (key))
-			log ("key " + key + " already in cache");
+		if (set.remove (key)) {
+			if (LOG) log ("key " + key + " already in cache");
+		}
 		else {
-			log ("adding key " + key + " to cache");
+			if (LOG) log ("adding key " + key + " to cache");
 			if (set.size() == capacity) {
 				// Discard the oldest element
 				Key oldest = set.iterator().next();
-				log ("discarding key " + oldest);
+				if (LOG) log ("discarding key " + oldest);
 				set.remove (oldest);
 			}
 		}
@@ -42,6 +45,6 @@ class LruCache<Key>
 	
 	private void log (String message)
 	{
-		// Event.log (message);
+		Event.log (message);
 	}
 }

@@ -19,7 +19,7 @@ public abstract class RequestHandler extends MessageHandler
 	
 	protected void handleAccepted (Accepted a)
 	{
-		if (searchState != SENT) node.log (a + " out of order");
+		if (searchState != SENT && LOG) node.log (a + " out of order");
 		searchState = ACCEPTED;
 		next.successNotOverload(); // Reset the backoff length
 		// Wait 60 seconds for a reply to the search
@@ -28,7 +28,8 @@ public abstract class RequestHandler extends MessageHandler
 	
 	protected void handleDataNotFound (DataNotFound dnf)
 	{
-		if (searchState != ACCEPTED) node.log (dnf + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (dnf + " out of order");
 		if (prev == null) node.log (this + " failed (dnf)");
 		else prev.sendMessage (dnf); // Forward the message
 		finish();
@@ -55,7 +56,7 @@ public abstract class RequestHandler extends MessageHandler
 	protected void transferTimeout (Peer p)
 	{
 		if (searchState != TRANSFERRING) return;
-		node.log (this + " transfer timeout from " + p);
+		if (LOG) node.log (this + " transfer timeout from " + p);
 		if (prev == null) node.log (this + " failed (xfer)");
 		finish();
 	}

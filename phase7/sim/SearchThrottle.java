@@ -4,6 +4,8 @@ package sim;
 
 public class SearchThrottle
 {
+	public final static boolean LOG = false;
+	
 	public final static double INITIAL_RATE = 5.0; // Searches per second
 	public final static double MAX_RATE = 50.0;
 	public final static double MIN_RATE = 1.0 / 300.0;
@@ -17,14 +19,14 @@ public class SearchThrottle
 	{
 		rate += ALPHA;
 		if (rate > MAX_RATE) rate = MAX_RATE;
-		Event.log ("rate increased to " + rate);
+		if (LOG) Event.log ("rate increased to " + rate);
 	}
 	
 	public void decreaseRate()
 	{
 		rate *= BETA;
 		if (rate < MIN_RATE) rate = MIN_RATE;
-		Event.log ("rate decreased to " + rate);
+		if (LOG) Event.log ("rate decreased to " + rate);
 	}
 	
 	// Return the time remaining until the next search can be sent

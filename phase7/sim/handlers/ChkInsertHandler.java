@@ -32,7 +32,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 				handleDataInsert ((DataInsert) m);
 			else if (m instanceof Block)
 				handleBlock ((Block) m);
-			else node.log ("unexpected type for " + m);
+			else if (LOG) node.log ("unexpected type for " + m);
 		}
 		else if (src == next) {
 			if (m instanceof Accepted)
@@ -47,19 +47,19 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 				handleInsertReply ((InsertReply) m);
 			else if (m instanceof TransfersCompleted)
 				handleCompleted ((TransfersCompleted) m, src);
-			else node.log ("unexpected type for " + m);
+			else if (LOG) node.log ("unexpected type for " + m);
 		}
 		else if (receivers.contains (src)) {
 			if (m instanceof TransfersCompleted)
 				handleCompleted ((TransfersCompleted) m, src);
-			else node.log ("unexpected type for " + m);
+			else if (LOG) node.log ("unexpected type for " + m);
 		}
-		else node.log ("unexpected source for " + m);
+		else if (LOG) node.log ("unexpected source for " + m);
 	}
 	
 	private void handleDataInsert (DataInsert di)
 	{
-		if (inState != STARTED) node.log (di + " out of order");
+		if (inState != STARTED && LOG) node.log (di + " out of order");
 		inState = TRANSFERRING;
 		// Start the search
 		forwardSearch();
@@ -74,7 +74,8 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleBlock (Block b)
 	{
-		if (inState != TRANSFERRING) node.log (b + " out of order");
+		if (inState != TRANSFERRING && LOG)
+			node.log (b + " out of order");
 		if (blocks[b.index] != null) return; // Ignore duplicates
 		blocks[b.index] = b;
 		blocksReceived++;
@@ -95,7 +96,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleAccepted (Accepted a)
 	{
-		if (searchState != SENT) node.log (a + " out of order");
+		if (searchState != SENT && LOG) node.log (a + " out of order");
 		searchState = ACCEPTED;
 		next.successNotOverload(); // Reset the backoff length
 		// Wait 120 seconds for a reply to the search
@@ -112,7 +113,8 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleInsertReply (InsertReply ir)
 	{
-		if (searchState != ACCEPTED) node.log (ir + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (ir + " out of order");
 		if (prev == null) {
 			node.log (this + " succeeded");
 			node.increaseSearchRate();
@@ -154,7 +156,9 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		inState = COMPLETED;
 		node.cacheChk (key);
 		node.storeChk (key);
-		if (prev == null) node.log (this + " completed");
+		if (prev == null) {
+			if (LOG) node.log (this + " completed");
+		}
 		else prev.sendMessage (new TransfersCompleted (id));
 		node.removeMessageHandler (id);
 	}
@@ -174,7 +178,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void dataTimeout()
 	{
 		if (inState != STARTED) return;
-		node.log (this + " data timeout from " + prev);
+		if (LOG) node.log (this + " data timeout from " + prev);
 		prev.sendMessage (new TransfersCompleted(id));
 		reallyFinish();
 	}
@@ -183,7 +187,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void transferInTimeout()
 	{
 		if (inState != TRANSFERRING) return;
-		node.log (this + " transfer timeout from " + prev);
+		if (LOG) node.log (this + " transfer timeout from " + prev);
 		prev.sendMessage (new TransfersCompleted(id));
 		reallyFinish();
 	}
@@ -192,7 +196,7 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	private void transferOutTimeout (Peer p)
 	{
 		if (!receivers.remove (p)) return;
-		node.log (this + " transfer timeout to " + p);
+		if (LOG) node.log (this + " transfer timeout to " + p);
 		// FIXME: should we back off?
 		considerFinishing();
 	}

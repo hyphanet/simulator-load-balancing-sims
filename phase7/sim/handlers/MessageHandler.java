@@ -7,6 +7,8 @@ import java.util.LinkedList;
 
 public abstract class MessageHandler
 {
+	public final static boolean LOG = false;
+	
 	// State machine
 	protected final static int STARTED = 0;
 	protected final static int SENT = 1;
@@ -39,7 +41,7 @@ public abstract class MessageHandler
 		double target = Node.keyToLocation (key);
 		if (Node.distance (target, node.location)
 		< Node.distance (target, closest)) {
-			node.log ("resetting htl of " + this); // FIXME
+			if (LOG) node.log ("resetting htl of " + this);
 			closest = node.location;
 			htl = Search.MAX_HTL;
 		}
@@ -57,7 +59,7 @@ public abstract class MessageHandler
 		next = null;
 		// If the search has run out of hops, reply and finish
 		if (htl == 0) {
-			node.log (this + " has no hops remaining");
+			if (LOG) node.log (this + " has no hops remaining");
 			sendReply();
 			finish();
 			return;
@@ -65,7 +67,7 @@ public abstract class MessageHandler
 		// Find the closest remaining peer
 		next = closestPeer();
 		if (next == null) {
-			node.log ("route not found for " + this);
+			if (LOG) node.log ("route not found for " + this);
 			if (prev == null) {
 				node.log (this + " failed (rnf)");
 				node.increaseSearchRate(); // Yes, increase
@@ -79,11 +81,11 @@ public abstract class MessageHandler
 		if (Node.distance (target, next.location)
 		>= Node.distance (target, closest))
 			htl = node.decrementHtl (htl);
-		node.log (this + " has htl " + htl);
+		if (LOG) node.log (this + " has htl " + htl);
 		// Consume a token
 		if (Node.useTokens) next.tokensOut--;
 		// Forward the search
-		node.log ("forwarding " + this + " to " + next.address);
+		if (LOG) node.log ("forwarding " +this+ " to " + next.address);
 		next.sendMessage (makeSearchMessage());
 		nexts.remove (next);
 		searchState = SENT;
@@ -97,7 +99,7 @@ public abstract class MessageHandler
 		Peer p = closestPeer (Node.useBackoff);
 		// If all peers are backed off, try again ignoring backoff
 		if (p == null && Node.useBackoff) {
-			node.log ("considering backed off peers");
+			if (LOG) node.log ("considering backed off peers");
 			return closestPeer (false);
 		}
 		else return p;
@@ -111,11 +113,11 @@ public abstract class MessageHandler
 		Peer closestPeer = null;
 		for (Peer peer : nexts) {
 			if (Node.useTokens && peer.tokensOut == 0) {
-				node.log ("no tokens for " + peer);
+				if (LOG) node.log ("no tokens for " + peer);
 				continue;
 			}
 			if (useBackoff && now < peer.backoffUntil) {
-				node.log ("backed off from " + peer
+				if (LOG) node.log ("backed off from " + peer
 					+ " until " + peer.backoffUntil);
 				continue;
 			}
@@ -130,7 +132,7 @@ public abstract class MessageHandler
 	
 	protected void handleRejectedLoop (RejectedLoop rl)
 	{
-		if (searchState != SENT) node.log (rl + " out of order");
+		if (searchState != SENT && LOG) node.log (rl + " out of order");
 		next.successNotOverload(); // Reset the backoff length
 		forwardSearch();
 	}
@@ -149,7 +151,8 @@ public abstract class MessageHandler
 	
 	protected void handleRouteNotFound (RouteNotFound rnf)
 	{
-		if (searchState != ACCEPTED) node.log (rnf + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (rnf + " out of order");
 		// Use the remaining htl to try another peer
 		if (rnf.htl < htl) htl = rnf.htl;
 		forwardSearch();
@@ -160,7 +163,7 @@ public abstract class MessageHandler
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != SENT) return;
-		node.log (this + " accepted timeout for " + p);
+		if (LOG) node.log (this + " accepted timeout for " + p);
 		p.localRejectedOverload(); // Back off from p
 		// Tell the sender to slow down
 		if (prev == null) node.decreaseSearchRate();
@@ -174,7 +177,7 @@ public abstract class MessageHandler
 	{
 		if (p != next) return; // We've already moved on to another peer
 		if (searchState != ACCEPTED) return;
-		node.log (this + " search timeout for " + p);
+		if (LOG) node.log (this + " search timeout for " + p);
 		p.localRejectedOverload(); // Back off from p
 		// Tell the sender to slow down
 		if (prev == null) {

@@ -3,6 +3,8 @@ import java.util.HashMap;
 
 class Network
 {
+	public final static boolean LOG = false;
+	
 	private static HashMap<Integer,NetworkInterface> interfaces
 		= new HashMap<Integer,NetworkInterface>();
 	private static int nextAddress = 0;
@@ -18,7 +20,7 @@ class Network
 		// If the network allows reordering, randomise the latency a bit
 		if (reorder) p.latency *= (0.95 + Math.random() * 0.1);
 		if (Math.random() < lossRate) {
-			Event.log (p + " lost by network");
+			if (LOG) Event.log (p + " lost by network");
 			return;
 		}
 		// Schedule the arrival of the packet at the destination

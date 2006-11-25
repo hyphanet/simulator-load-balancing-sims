@@ -9,6 +9,8 @@ import java.util.LinkedList;
 
 public class Node implements EventTarget
 {
+	public final static boolean LOG = false;
+	
 	// Coarse-grained retransmission timer
 	public final static double RETX_TIMER = 0.1; // Seconds
 	
@@ -75,7 +77,6 @@ public class Node implements EventTarget
 	{
 		if (n == this) return false;
 		if (peers.containsKey (n.net.address)) return false;
-		// log ("adding peer " + n.net.address);
 		Peer p = new Peer (this, n.net.address, n.location, latency);
 		peers.put (n.net.address, p);
 		return true;
@@ -152,7 +153,7 @@ public class Node implements EventTarget
 	{
 		if (recentlySeenRequests.add (id)) return false;
 		
-		log ("rejecting recently seen search " + id);
+		if (LOG) log ("rejecting recently seen search " + id);
 		prev.sendMessage (new RejectedLoop (id));
 		if (useTokens) allocateToken (prev);
 		// Don't forward the same search back to prev
@@ -164,7 +165,7 @@ public class Node implements EventTarget
 	// Add a CHK to the cache
 	public void cacheChk (int key)
 	{
-		log ("key " + key + " added to CHK cache");
+		if (LOG) log ("key " + key + " added to CHK cache");
 		chkCache.put (key);
 	}
 	
@@ -172,10 +173,10 @@ public class Node implements EventTarget
 	public void storeChk (int key)
 	{
 		if (closerThanPeers (keyToLocation (key))) {
-			log ("key " + key + " added to CHK store");
+			if (LOG) log ("key " + key + " added to CHK store");
 			chkStore.put (key);
 		}
-		else log ("key " + key + " not added to CHK store");
+		else if (LOG) log ("key " + key + " not added to CHK store");
 	}
 	
 	// Retrieve an SSK from the cache or the store
@@ -189,7 +190,7 @@ public class Node implements EventTarget
 	// Add an SSK to the cache
 	public void cacheSsk (int key, int value)
 	{
-		log ("key " + key + " added to SSK cache");
+		if (LOG) log ("key " + key + " added to SSK cache");
 		sskCache.put (key, value);
 	}
 	
@@ -197,16 +198,16 @@ public class Node implements EventTarget
 	public void storeSsk (int key, int value)
 	{
 		if (closerThanPeers (keyToLocation (key))) {
-			log ("key " + key + " added to SSK store");
+			if (LOG) log ("key " + key + " added to SSK store");
 			sskStore.put (key, value);
 		}
-		else log ("key " + key + " not added to SSK store");
+		else if (LOG) log ("key " + key + " not added to SSK store");
 	}
 	
 	// Add a public key to the cache
 	public void cachePubKey (int key)
 	{
-		log ("public key " + key + " added to cache");
+		if (LOG) log ("public key " + key + " added to cache");
 		pubKeyCache.put (key);
 	}
 	
@@ -214,10 +215,10 @@ public class Node implements EventTarget
 	public void storePubKey (int key)
 	{
 		if (closerThanPeers (keyToLocation (key))) {
-			log ("public key " + key + " added to store");
+			if (LOG) log ("public key " + key + " added to store");
 			pubKeyStore.put (key);
 		}
-		else log ("public key " + key + " not added to store");
+		else if (LOG) log ("public key " + key + " not added to store");
 	}
 	
 	// Called by Peer to start the retransmission timer
@@ -225,7 +226,7 @@ public class Node implements EventTarget
 	{
 		if (timerRunning) return;
 		timerRunning = true;
-		// log ("starting retransmission timer");
+		if (LOG) log ("starting retransmission timer");
 		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
@@ -238,12 +239,12 @@ public class Node implements EventTarget
 		if (p.messages != null) {
 			double now = Event.time();
 			for (Message m : p.messages) {
-				log ("sending " + m + " to " + p.dest);
+				if (LOG) log ("sending " + m + " to " + p.dest);
 				double d = now - m.deadline;
 				delay *= DELAY_DECAY;
 				delay += d * (1.0 - DELAY_DECAY);
 			}
-			log ("average message delay " + delay);
+			if (LOG) log ("average message delay " + delay);
 		}
 		// Send the packet
 		net.sendPacket (p);
@@ -262,14 +263,16 @@ public class Node implements EventTarget
 	public void handlePacket (Packet p)
 	{
 		Peer peer = peers.get (p.src);
-		if (peer == null) log ("received packet from unknown peer");
+		if (peer == null) {
+			if (LOG) log ("received packet from unknown peer");
+		}
 		else peer.handlePacket (p);
 	}
 	
 	// Called by Peer
 	public void handleMessage (Message m, Peer src)
 	{
-		if (src != null) log ("received " + m + " from " + src);
+		if (src != null && LOG) log ("received " + m + " from " + src);
 		if (m instanceof Token)
 			handleToken ((Token) m, src);
 		else if (m instanceof ChkRequest)
@@ -282,7 +285,9 @@ public class Node implements EventTarget
 			handleSskInsert ((SskInsert) m, src);
 		else {
 			MessageHandler mh = messageHandlers.get (m.id);
-			if (mh == null) log ("no message handler for " + m);
+			if (mh == null) {
+				if (LOG) log ("no message handler for " + m);
+			}
 			else mh.handleMessage (m, src);
 		}
 	}
@@ -300,12 +305,12 @@ public class Node implements EventTarget
 		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Accept the search
 		if (prev != null) {
-			log ("accepting " + r);
+			if (LOG) log ("accepting " + r);
 			prev.sendMessage (new Accepted (r.id));
 		}
 		// If the data is in the store, return it
 		if (chkStore.get (r.key)) {
-			log ("key " + r.key + " found in CHK store");
+			if (LOG) log ("key " + r.key + " found in CHK store");
 			if (prev == null) log (r + " succeeded locally");
 			else {
 				prev.sendMessage (new ChkDataFound (r.id));
@@ -315,10 +320,10 @@ public class Node implements EventTarget
 			if (useTokens) allocateToken (prev);
 			return;
 		}
-		log ("key " + r.key + " not found in CHK store");
+		if (LOG) log ("key " + r.key + " not found in CHK store");
 		// If the data is in the cache, return it
 		if (chkCache.get (r.key)) {
-			log ("key " + r.key + " found in CHK cache");
+			if (LOG) log ("key " + r.key + " found in CHK cache");
 			if (prev == null) log (r + " succeeded locally");
 			else {
 				prev.sendMessage (new ChkDataFound (r.id));
@@ -328,7 +333,7 @@ public class Node implements EventTarget
 			if (useTokens) allocateToken (prev);
 			return;
 		}
-		log ("key " + r.key + " not found in CHK cache");
+		if (LOG) log ("key " + r.key + " not found in CHK cache");
 		// Store the request handler and forward the search
 		ChkRequestHandler rh = new ChkRequestHandler (r, this, prev);
 		messageHandlers.put (r.id, rh);
@@ -343,7 +348,7 @@ public class Node implements EventTarget
 		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Accept the search
 		if (prev != null) {
-			log ("accepting " + i);
+			if (LOG) log ("accepting " + i);
 			prev.sendMessage (new Accepted (i.id));
 		}
 		// Store the insert handler and wait for a DataInsert
@@ -360,17 +365,19 @@ public class Node implements EventTarget
 		if (rejectIfRecentlySeen (prev, r.id)) return;
 		// Look up the public key
 		boolean pub = pubKeyStore.get (r.key) || pubKeyCache.get(r.key);
-		if (pub) log ("public key " + r.key + " found in cache");
-		else log ("public key " + r.key + " not found in cache");
+		if (LOG) {
+			if (pub) log ("public key " +r.key+ " found in cache");
+			else log ("public key " +r.key+ " not found in cache");
+		}
 		// Accept the search
 		if (prev != null) {
-			log ("accepting " + r);
+			if (LOG) log ("accepting " + r);
 			prev.sendMessage (new Accepted (r.id));
 		}
 		// If the data is in the store, return it
 		Integer data = sskStore.get (r.key);
 		if (pub && data != null) {
-			log ("key " + r.key + " found in SSK store");
+			if (LOG) log ("key " + r.key + " found in SSK store");
 			if (prev == null) log (r + " succeeded locally");
 			else {
 				prev.sendMessage (new SskDataFound (r.id,data));
@@ -381,11 +388,11 @@ public class Node implements EventTarget
 			if (useTokens) allocateToken (prev);
 			return;
 		}
-		log ("key " + r.key + " not found in SSK store");
+		if (LOG) log ("key " + r.key + " not found in SSK store");
 		// If the data is in the cache, return it
 		data = sskCache.get (r.key);
 		if (pub && data != null) {
-			log ("key " + r.key + " found in SSK cache");
+			if (LOG) log ("key " + r.key + " found in SSK cache");
 			if (prev == null) log (r + " succeeded locally");
 			else {
 				prev.sendMessage (new SskDataFound (r.id,data));
@@ -396,7 +403,7 @@ public class Node implements EventTarget
 			if (useTokens) allocateToken (prev);
 			return;
 		}
-		log ("key " + r.key + " not found in SSK cache");
+		if (LOG) log ("key " + r.key + " not found in SSK cache");
 		// Store the request handler and forward the search
 		SskRequestHandler rh = new SskRequestHandler (r,this,prev,!pub);
 		messageHandlers.put (r.id, rh);
@@ -411,11 +418,13 @@ public class Node implements EventTarget
 		if (rejectIfRecentlySeen (prev, i.id)) return;
 		// Look up the public key
 		boolean pub = pubKeyStore.get (i.key) || pubKeyCache.get(i.key);
-		if (pub) log ("public key " + i.key + " found in cache");
-		else log ("public key " + i.key + " not found in cache");
+		if (LOG) {
+			if (pub) log ("public key " +i.key+ " found in cache");
+			else log ("public key " +i.key+ " not found in cache");
+		}
 		// Accept the search
 		if (prev != null) {
-			log ("accepting " + i);
+			if (LOG) log ("accepting " + i);
 			prev.sendMessage (new SskAccepted (i.id, !pub));
 		}
 		// Store the insert handler and possibly wait for the pub key
@@ -437,9 +446,11 @@ public class Node implements EventTarget
 	public void removeMessageHandler (int id)
 	{
 		MessageHandler mh = messageHandlers.remove (id);
-		if (mh == null) log ("no message handler to remove for " + id);
+		if (mh == null) {
+			if (LOG) log ("no message handler to remove for " + id);
+		}
 		else {
-			log ("removing message handler for " + id);
+			if (LOG) log ("removing message handler for " + id);
 			if (useTokens) allocateToken (mh.prev);
 		}
 	}
@@ -450,7 +461,7 @@ public class Node implements EventTarget
 		if (p == null) {
 			if (spareTokens == 0) {
 				// The client will have to wait
-				log ("not enough tokens");
+				if (LOG) log ("not enough tokens");
 				return false;
 			}
 			spareTokens--;
@@ -459,7 +470,7 @@ public class Node implements EventTarget
 		else {
 			if (p.tokensIn == 0) {
 				// This indicates a misbehaving sender
-				log ("WARNING: not enough tokens");
+				if (LOG) log ("WARNING: not enough tokens");
 				return false;
 			}
 			p.tokensIn--;
@@ -494,14 +505,14 @@ public class Node implements EventTarget
 	private void addToSearchQueue (Search s)
 	{
 		searchQueue.add (s);
-		log (searchQueue.size() + " searches in queue");
 		if (useThrottle) {
+			if (LOG) log (searchQueue.size() +" searches in queue");
 			if (searchQueue.size() > 1) return; // Already waiting
 			double now = Event.time();
 			double wait = searchThrottle.delay (now);
 			if (wait <= 0.0) sendSearch();
 			else {
-				log ("throttled for " + wait + " seconds");
+				if (LOG) log ("throttled for "+wait+" seconds");
 				Event.schedule (this, wait, SEND_SEARCH, null);
 			}
 		}
@@ -531,7 +542,7 @@ public class Node implements EventTarget
 			searchThrottle.sent (now);
 			if (searchQueue.isEmpty()) return;
 			double wait = searchThrottle.delay (now);
-			log ("throttled for " + wait + " seconds");
+			if (LOG) log ("throttled for " + wait + " seconds");
 			Event.schedule (this, wait, SEND_SEARCH, null);
 		}
 	}
@@ -539,28 +550,28 @@ public class Node implements EventTarget
 	public void generateChkRequest (int key)
 	{
 		ChkRequest cr = new ChkRequest (key, location);
-		log ("generating " + cr);
+		if (LOG) log ("generating " + cr);
 		addToSearchQueue (cr);
 	}
 	
 	public void generateChkInsert (int key)
 	{
 		ChkInsert ci = new ChkInsert (key, location);
-		log ("generating " + ci);
+		if (LOG) log ("generating " + ci);
 		addToSearchQueue (ci);
 	}
 	
 	public void generateSskRequest (int key)
 	{
 		SskRequest sr = new SskRequest (key, location, true);
-		log ("generating " + sr);
+		if (LOG) log ("generating " + sr);
 		addToSearchQueue (sr);
 	}
 	
 	public void generateSskInsert (int key, int value)
 	{
 		SskInsert si = new SskInsert (key, value, location);
-		log ("generating " + si);
+		if (LOG) log ("generating " + si);
 		addToSearchQueue (si);
 	}
 	
@@ -569,7 +580,7 @@ public class Node implements EventTarget
 		boolean stopTimer = true;
 		for (Peer p : peers()) if (p.checkTimeouts()) stopTimer = false;
 		if (stopTimer) {
-			// log ("stopping retransmission timer");
+			if (LOG) log ("stopping retransmission timer");
 			timerRunning = false;
 		}
 		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);

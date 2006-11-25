@@ -5,6 +5,8 @@ import java.util.LinkedList;
 
 class NetworkInterface implements EventTarget
 {
+	public final static boolean LOG = false;
+	
 	public final int address; // Represents an IP address and port
 	private Node node; // The owner of this network interface
 	private double txSpeed, rxSpeed; // Bytes per second
@@ -32,12 +34,12 @@ class NetworkInterface implements EventTarget
 	public void sendPacket (Packet p)
 	{
 		if (txQueueSize + p.size > txQueueMaxSize) {
-			log ("no room in txQueue, " + p + " lost");
+			if (LOG) log ("no room in txQueue, " + p + " lost");
 			return;
 		}
 		txQueue.add (p);
 		txQueueSize += p.size;
-		log (txQueueSize + " bytes in txQueue");
+		if (LOG) log (txQueueSize + " bytes in txQueue");
 		// If there are no other packets in the queue, start to transmit
 		if (txQueue.size() == 1) txStart (p);
 	}
@@ -48,12 +50,12 @@ class NetworkInterface implements EventTarget
 	private void rxQueueAdd (Packet p)
 	{
 		if (rxQueueSize + p.size > rxQueueMaxSize) {
-			log ("no room in rxQueue, " + p + " lost");
+			if (LOG) log ("no room in rxQueue, " + p + " lost");
 			return;
 		}
 		rxQueue.add (p);
 		rxQueueSize += p.size;
-		log (rxQueueSize + " bytes in rxQueue");
+		if (LOG) log (rxQueueSize + " bytes in rxQueue");
 		// If there are no other packets in the queue, start to receive
 		if (rxQueue.size() == 1) rxStart (p);
 	}
@@ -61,7 +63,7 @@ class NetworkInterface implements EventTarget
 	// Start receiving a packet
 	private void rxStart (Packet p)
 	{
-		log ("starting to receive " + p);
+		if (LOG) log ("starting to receive " + p);
 		// Delay depends on rx speed
 		Event.schedule (this, p.size / rxSpeed, RX_END, p);
 	}
@@ -69,7 +71,7 @@ class NetworkInterface implements EventTarget
 	// Finish receiving a packet, pass it to the node
 	private void rxEnd (Packet p)
 	{
-		log ("finished receiving " + p);
+		if (LOG) log ("finished receiving " + p);
 		node.handlePacket (p);
 		rxQueueSize -= p.size;
 		rxQueue.poll();
@@ -80,7 +82,7 @@ class NetworkInterface implements EventTarget
 	// Start transmitting a packet
 	private void txStart (Packet p)
 	{
-		log ("starting to transmit " + p);
+		if (LOG) log ("starting to transmit " + p);
 		// Delay depends on tx speed
 		Event.schedule (this, p.size / txSpeed, TX_END, p);
 	}
@@ -88,7 +90,7 @@ class NetworkInterface implements EventTarget
 	// Finish transmitting a packet
 	private void txEnd (Packet p)
 	{
-		log ("finished transmitting " + p);
+		if (LOG) log ("finished transmitting " + p);
 		Network.deliver (p);
 		txQueueSize -= p.size;
 		txQueue.poll();
@@ -98,7 +100,7 @@ class NetworkInterface implements EventTarget
 	
 	private void log (String message)
 	{
-		// Event.log (address + " " + message);
+		Event.log (address + " " + message);
 	}
 	
 	// EventTarget interface

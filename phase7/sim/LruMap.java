@@ -6,6 +6,8 @@ import java.util.HashMap;
 
 class LruMap<Key,Value>
 {
+	public final static boolean LOG = false;
+	
 	public final int capacity;
 	private LinkedHashSet<Key> set;
 	private HashMap<Key,Value> map;
@@ -19,7 +21,7 @@ class LruMap<Key,Value>
 	
 	public Value get (Key key)
 	{
-		log ("searching cache for key " + key);
+		if (LOG) log ("searching cache for key " + key);
 		Value value = map.get (key);
 		if (value != null) {
 			// Move the key to the fresh end
@@ -34,18 +36,18 @@ class LruMap<Key,Value>
 	{
 		Value existing = map.get (key);
 		if (existing == null) {
-			log ("adding key " + key + " to cache");
+			if (LOG) log ("adding key " + key + " to cache");
 			if (set.size() == capacity) {
 				// Discard the oldest element
 				Key oldest = set.iterator().next();
-				log ("discarding key " + oldest);
+				if (LOG) log ("discarding key " + oldest);
 				set.remove (oldest);
 			}
 			map.put (key, value);
 			return value;
 		}
 		else {
-			log ("key " + key + " already in cache");
+			if (LOG) log ("key " + key + " already in cache");
 			// Move the key to the fresh end
 			set.remove (key);
 			set.add (key);
@@ -55,6 +57,6 @@ class LruMap<Key,Value>
 	
 	private void log (String message)
 	{
-		// Event.log (message);
+		Event.log (message);
 	}
 }

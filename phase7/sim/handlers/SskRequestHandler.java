@@ -20,8 +20,9 @@ public class SskRequestHandler extends RequestHandler
 	
 	public void handleMessage (Message m, Peer src)
 	{
-		if (src != next)
-			node.log ("unexpected source for " + m);
+		if (src != next) {
+			if (LOG) node.log ("unexpected source for " + m);
+		}
 		else if (m instanceof Accepted)
 			handleAccepted ((Accepted) m);
 		else if (m instanceof RejectedLoop)
@@ -36,12 +37,13 @@ public class SskRequestHandler extends RequestHandler
 			handleSskDataFound ((SskDataFound) m);
 		else if (m instanceof SskPubKey)
 			handleSskPubKey ((SskPubKey) m);
-		else node.log ("unexpected type for " + m);
+		else if (LOG) node.log ("unexpected type for " + m);
 	}
 	
 	private void handleSskDataFound (SskDataFound df)
 	{
-		if (searchState != ACCEPTED) node.log (df + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (df + " out of order");
 		dataFound = df;
 		if (pubKey == null) return; // Keep waiting
 		if (prev == null) {
@@ -59,7 +61,8 @@ public class SskRequestHandler extends RequestHandler
 	
 	private void handleSskPubKey (SskPubKey pk)
 	{
-		if (searchState != ACCEPTED) node.log (pk + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (pk + " out of order");
 		pubKey = pk;
 		if (dataFound == null) return; // Keep waiting
 		if (prev == null) {

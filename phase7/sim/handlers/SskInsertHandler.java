@@ -35,8 +35,10 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	{
 		Integer old = node.fetchSsk (key);
 		if (old != null && old.intValue() != data) {
-			node.log (this + " collided");
-			if (prev == null) node.log (this + " collided locally");
+			if (LOG) node.log (this + " collided");
+			if (prev == null) {
+				if (LOG) node.log (this + " collided locally");
+			}
 			else prev.sendMessage (new SskDataFound (id, old));
 			// Continue inserting the old data
 			data = old;
@@ -49,7 +51,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 		if (src == prev) {
 			if (m instanceof SskPubKey)
 				handleSskPubKey ((SskPubKey) m);
-			else node.log ("unexpected type for " + m);
+			else if (LOG) node.log ("unexpected type for " + m);
 		}
 		else if (src == next) {
 			if (m instanceof SskAccepted)
@@ -64,14 +66,15 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 				handleCollision ((SskDataFound) m);
 			else if (m instanceof InsertReply)
 				handleInsertReply ((InsertReply) m);
-			else node.log ("unexpected type for " + m);
+			else if (LOG) node.log ("unexpected type for " + m);
 		}
-		else node.log ("unexpected source for " + m);
+		else if (LOG) node.log ("unexpected source for " + m);
 	}
 	
 	private void handleSskPubKey (SskPubKey pk)
 	{
-		if (searchState != STARTED) node.log (pk + " out of order");
+		if (searchState != STARTED && LOG)
+			node.log (pk + " out of order");
 		pubKey = pk;
 		checkCollision();
 		forwardSearch();
@@ -79,7 +82,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleSskAccepted (SskAccepted sa)
 	{
-		if (searchState != SENT) node.log (sa + " out of order");
+		if (searchState != SENT && LOG) node.log (sa + " out of order");
 		searchState = ACCEPTED;
 		next.successNotOverload(); // Reset the backoff length
 		// Wait 60 seconds for a reply to the search
@@ -90,15 +93,19 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	
 	private void handleCollision (SskDataFound sdf)
 	{
-		if (searchState != ACCEPTED) node.log (sdf + " out of order");
-		if (prev == null) node.log (this + " collided");
+		if (searchState != ACCEPTED && LOG)
+			node.log (sdf + " out of order");
+		if (prev == null) {
+			if (LOG) node.log (this + " collided");
+		}
 		else prev.sendMessage (sdf); // Forward the message
 		data = sdf.data; // Is this safe?
 	}
 	
 	private void handleInsertReply (InsertReply ir)
 	{
-		if (searchState != ACCEPTED) node.log (ir + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (ir + " out of order");
 		if (prev == null) {
 			node.log (this + " succeeded");
 			node.increaseSearchRate();
@@ -145,7 +152,7 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	private void keyTimeout()
 	{
 		if (searchState != STARTED) return;
-		node.log (this + " key timeout for " + prev);
+		if (LOG) node.log (this + " key timeout for " + prev);
 		finish();
 	}
 	

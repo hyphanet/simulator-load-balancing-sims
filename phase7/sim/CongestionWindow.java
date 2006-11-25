@@ -4,6 +4,8 @@ package sim;
 
 class CongestionWindow
 {
+	public final static boolean LOG = false;
+	
 	public final static int MIN_CWIND = Packet.MAX_SIZE; // Min window size
 	public final static int MAX_CWIND = 1000000; // Max window size
 	public final static double ALPHA = 0.3125; // AIMD increase parameter
@@ -22,10 +24,12 @@ class CongestionWindow
 	
 	public void reset()
 	{
-		peer.log ("congestion window decreased to " + MIN_CWIND);
 		cwind = MIN_CWIND;
-		peer.log ("returning to slow start");
 		slowStart = true;
+		if (LOG) {
+			peer.log ("congestion window decreased to " + cwind);
+			peer.log ("returning to slow start");
+		}
 	}
 	
 	public int available()
@@ -37,31 +41,35 @@ class CongestionWindow
 	public void bytesSent (int bytes)
 	{
 		inflight += bytes;
-		peer.log (inflight + " bytes in flight");
+		if (LOG) peer.log (inflight + " bytes in flight");
 	}
 	
 	// Take bytes out of flight
 	public void bytesAcked (int bytes)
 	{
 		inflight -= bytes;
-		peer.log (inflight + " bytes in flight");
 		// Increase the window
 		if (slowStart) cwind += bytes / GAMMA;
 		else cwind += bytes * bytes * ALPHA / cwind;
 		if (cwind > MAX_CWIND) cwind = MAX_CWIND;
-		peer.log ("congestion window increased to " + cwind);
+		if (LOG) {
+			peer.log (inflight + " bytes in flight");
+			peer.log ("congestion window increased to " + cwind);
+		}
 	}
 	
 	// Decrease the window when a packet is fast retransmitted
 	public void fastRetransmission (double now)
 	{
-		peer.log (inflight + " bytes in flight");
 		cwind *= BETA;
 		if (cwind < MIN_CWIND) cwind = MIN_CWIND;
-		peer.log ("congestion window decreased to " + cwind);
+		if (LOG) {
+			peer.log (inflight + " bytes in flight");
+			peer.log ("congestion window decreased to " + cwind);
+		}
 		// The slow start phase ends when the first packet is lost
 		if (slowStart) {
-			peer.log ("leaving slow start");
+			if (LOG) peer.log ("leaving slow start");
 			slowStart = false;
 		}
 	}
@@ -69,7 +77,7 @@ class CongestionWindow
 	// Decrease the window when a packet is retransmitted due to a timeout
 	public void timeout (double now)
 	{
-		peer.log (inflight + " bytes in flight");
+		if (LOG) peer.log (inflight + " bytes in flight");
 		if (slowStart) fastRetransmission (now); // Leave slow start
 		else reset(); // Reset the window and return to slow start
 	}

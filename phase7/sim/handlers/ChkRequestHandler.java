@@ -17,8 +17,9 @@ public class ChkRequestHandler extends RequestHandler
 	
 	public void handleMessage (Message m, Peer src)
 	{
-		if (src != next)
-			node.log ("unexpected source for " + m);
+		if (src != next) {
+			if (LOG) node.log ("unexpected source for " + m);
+		}
 		else if (m instanceof Accepted)
 			handleAccepted ((Accepted) m);
 		else if (m instanceof RejectedLoop)
@@ -33,12 +34,13 @@ public class ChkRequestHandler extends RequestHandler
 			handleChkDataFound ((ChkDataFound) m);
 		else if (m instanceof Block)
 			handleBlock ((Block) m);
-		else node.log ("unexpected type for " + m);
+		else if (LOG) node.log ("unexpected type for " + m);
 	}
 	
 	private void handleChkDataFound (ChkDataFound df)
 	{
-		if (searchState != ACCEPTED) node.log (df + " out of order");
+		if (searchState != ACCEPTED && LOG)
+			node.log (df + " out of order");
 		searchState = TRANSFERRING;
 		if (prev != null) prev.sendMessage (df); // Forward the message
 		// If we have all the blocks and the headers, cache the data
@@ -56,13 +58,14 @@ public class ChkRequestHandler extends RequestHandler
 	
 	private void handleBlock (Block b)
 	{
-		if (searchState != TRANSFERRING) node.log (b + " out of order");
+		if (searchState != TRANSFERRING && LOG)
+			node.log (b + " out of order");
 		if (blocks[b.index]) return; // Ignore duplicates
 		blocks[b.index] = true;
 		blocksReceived++;
 		// Forward the block
 		if (prev != null) {
-			node.log ("forwarding " + b);
+			if (LOG) node.log ("forwarding " + b);
 			prev.sendMessage (b);
 		}
 		// If we have all the blocks and the headers, cache the data
