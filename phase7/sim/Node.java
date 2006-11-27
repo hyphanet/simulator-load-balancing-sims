@@ -18,8 +18,7 @@ public class Node implements EventTarget
 	public static boolean useTokens = false;
 	public static boolean useBackoff = false;
 	public static boolean useThrottle = false;
-	public final static int FLOW_TOKENS = 20; // Shared by all peers
-	public final static double TOKEN_DELAY = 1.0; // Allocate initial tokens
+	public final static int FLOW_TOKENS = 50; // Shared by all peers
 	public final static double DELAY_DECAY = 0.99; // Exp moving average
 	public final static double MAX_DELAY = 2.0; // Reject all, seconds
 	public final static double HIGH_DELAY = 1.0; // Reject some, seconds
@@ -43,6 +42,7 @@ public class Node implements EventTarget
 	private double delay = 0.0; // Delay caused by congestion or b/w limiter
 	private LinkedList<Search> searchQueue;
 	private SearchThrottle searchThrottle;
+	private HashSet<Peer> availablePeers; // Peers with outgoing tokens
 	
 	public Node (double txSpeed, double rxSpeed)
 	{
@@ -65,10 +65,13 @@ public class Node implements EventTarget
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
 		bandwidth = new TokenBucket (40000, 60000);
-		// Allocate flow control tokens after a short delay
-		if (useTokens) Event.schedule (this, Math.random() * 0.1,
-						ALLOCATE_TOKENS, null);
 		searchQueue = new LinkedList<Search>();
+		if (useTokens) {
+			// Allocate flow control tokens after a short delay
+			Event.schedule (this, Math.random() * 0.1,
+					ALLOCATE_TOKENS, null);
+			availablePeers = new HashSet<Peer>();
+		}
 		if (useThrottle) searchThrottle = new SearchThrottle();
 	}
 	
@@ -294,7 +297,7 @@ public class Node implements EventTarget
 	
 	private void handleToken (Token t, Peer prev)
 	{
-		prev.tokensOut += t.id; // t.id is the number of tokens
+		prev.addTokensOut (t.id); // t.id is the number of tokens
 	}
 	
 	private void handleChkRequest (ChkRequest r, Peer prev)
@@ -468,12 +471,12 @@ public class Node implements EventTarget
 			return true;
 		}
 		else {
-			if (p.tokensIn == 0) {
+			if (p.getTokensIn() == 0) {
 				// This indicates a misbehaving sender
 				if (LOG) log ("WARNING: not enough tokens");
 				return false;
 			}
-			p.tokensIn--;
+			p.removeTokensIn (1);
 			return true;
 		}
 	}
@@ -482,10 +485,7 @@ public class Node implements EventTarget
 	private void allocateToken (Peer p)
 	{
 		if (p == null) spareTokens++;
-		else {
-			p.tokensIn++;
-			p.sendMessage (new Token (1));
-		}
+		else p.addTokensIn (1);
 	}
 	
 	// Return the list of peers in a random order
@@ -522,6 +522,10 @@ public class Node implements EventTarget
 	// Remove the first search from the queue and send it
 	private void sendSearch()
 	{
+		if (useTokens && availablePeers.isEmpty()) {
+			if (LOG) log ("blocked");
+			return;
+		}
 		Search s = searchQueue.poll();
 		if (s instanceof ChkRequest)
 			handleChkRequest ((ChkRequest) s, null);
@@ -545,6 +549,18 @@ public class Node implements EventTarget
 			if (LOG) log ("throttled for " + wait + " seconds");
 			Event.schedule (this, wait, SEND_SEARCH, null);
 		}
+	}
+	
+	public void addAvailablePeer (Peer p)
+	{
+		boolean blocked = availablePeers.isEmpty();
+		availablePeers.add (p);
+		if (blocked && !searchQueue.isEmpty()) sendSearch();
+	}
+	
+	public void removeAvailablePeer (Peer p)
+	{
+		availablePeers.remove (p);
 	}
 	
 	public void generateChkRequest (int key)
@@ -592,9 +608,8 @@ public class Node implements EventTarget
 		// Rounding error in your favour - collect 50 tokens
 		int tokensPerPeer = FLOW_TOKENS / (peers.size() + 1);
 		for (Peer p : peers.values()) {
-			p.tokensIn += tokensPerPeer;
 			spareTokens -= tokensPerPeer;
-			p.sendMessage (new Token (tokensPerPeer));
+			p.addTokensIn (tokensPerPeer);
 		}
 	}
 	

@@ -83,7 +83,7 @@ public abstract class MessageHandler
 			htl = node.decrementHtl (htl);
 		if (LOG) node.log (this + " has htl " + htl);
 		// Consume a token
-		if (Node.useTokens) next.tokensOut--;
+		if (Node.useTokens) next.removeTokensOut (1);
 		// Forward the search
 		if (LOG) node.log ("forwarding " +this+ " to " + next.address);
 		next.sendMessage (makeSearchMessage());
@@ -112,7 +112,7 @@ public abstract class MessageHandler
 		double closestDist = Double.POSITIVE_INFINITY;
 		Peer closestPeer = null;
 		for (Peer peer : nexts) {
-			if (Node.useTokens && peer.tokensOut == 0) {
+			if (Node.useTokens && peer.getTokensOut() == 0) {
 				if (LOG) node.log ("no tokens for " + peer);
 				continue;
 			}

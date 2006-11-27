@@ -49,8 +49,8 @@ public class Peer implements EventTarget
 	private int rxSeq = 0; // Sequence number of next in-order incoming pkt
 	
 	// Flow control
-	public int tokensOut = 0; // How many requests/inserts can we send?
-	public int tokensIn = 0; // How many requests/inserts should we accept?
+	private int tokensOut = 0; // How many searches can we send?
+	private int tokensIn = 0; // How many searches should we accept?
 	public double backoffUntil = 0.0; // Time
 	public double backoffLength = INITIAL_BACKOFF; // Seconds
 	
@@ -277,6 +277,45 @@ public class Peer implements EventTarget
 		if (Event.time() < backoffUntil) return;
 		backoffLength = INITIAL_BACKOFF;
 		if (LOG) log ("resetting backoff length");
+	}
+	
+	// Add outgoing tokens
+	public void addTokensOut (int tokens)
+	{
+		tokensOut += tokens;
+		if (tokensOut > 0) node.addAvailablePeer (this);
+	}
+	
+	// Remove outgoing tokens
+	public void removeTokensOut (int tokens)
+	{
+		tokensOut -= tokens;
+		if (tokensOut <= 0) node.removeAvailablePeer (this);
+	}
+	
+	// Return the number of outgoing tokens
+	public int getTokensOut()
+	{
+		return tokensOut;
+	}
+	
+	// Add incoming tokens
+	public void addTokensIn (int tokens)
+	{
+		tokensIn += tokens;
+		sendMessage (new Token (tokens)); // Inform the other side
+	}
+	
+	// Remove incoming tokens
+	public void removeTokensIn (int tokens)
+	{
+		tokensIn -= tokens;
+	}
+	
+	// Return the number of incoming tokens
+	public int getTokensIn()
+	{
+		return tokensIn;
 	}
 	
 	// Check retx timeouts, return true if there are packets in flight
