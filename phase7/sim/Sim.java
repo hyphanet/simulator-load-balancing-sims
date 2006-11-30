@@ -5,7 +5,8 @@ class Sim
 {
 	private final int NODES = 100; // Number of nodes
 	private final int DEGREE = 5; // Average degree
-	private final double SPEED = 15000; // Network speed, bytes per second
+	private final double FAST = 15000; // Speed of fast nodes, bytes/second
+	private final double SLOW = 5000; // Speed of slow nodes, bytes/second
 	private final double LATENCY = 0.1; // Latency of all links in seconds
 	private Node[] nodes;
 	
@@ -14,10 +15,14 @@ class Sim
 		Network.reorder = true;
 		Network.lossRate = 0.001;
 		
-		// Create the nodes
+		// Create the nodes - ten percent are slow
 		nodes = new Node[NODES];
-		for (int i = 0; i < NODES; i++)
-			nodes[i] = new Node (1.0 / NODES * i, SPEED, SPEED);
+		for (int i = 0; i < NODES; i++) {
+			double location = (double) i / NODES;
+			if (Math.random() < 0.9)
+				nodes[i] = new Node (location, FAST, FAST);
+			else nodes[i] = new Node (location, SLOW, SLOW);
+		}
 		// Connect the nodes
 		makeKleinbergNetwork();
 		// One in ten nodes is a publisher, each with ten readers
