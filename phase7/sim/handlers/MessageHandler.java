@@ -69,7 +69,8 @@ public abstract class MessageHandler
 		if (next == null) {
 			if (LOG) node.log ("route not found for " + this);
 			if (prev == null) {
-				node.log (this + " failed (rnf)");
+				if (LOG) node.log (this + " failed (rnf)");
+				Node.failed++;
 				node.increaseSearchRate(); // Yes, increase
 			}
 			else prev.sendMessage (new RouteNotFound (id, htl));
@@ -181,7 +182,8 @@ public abstract class MessageHandler
 		p.localRejectedOverload(); // Back off from p
 		// Tell the sender to slow down
 		if (prev == null) {
-			node.log (this + " failed (search)");
+			if (LOG) node.log (this + " failed (search)");
+			Node.failed++;
 			node.decreaseSearchRate();
 		}
 		else prev.sendMessage (new RejectedOverload (id, false));

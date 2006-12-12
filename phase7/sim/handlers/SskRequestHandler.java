@@ -47,7 +47,8 @@ public class SskRequestHandler extends RequestHandler
 		dataFound = df;
 		if (pubKey == null) return; // Keep waiting
 		if (prev == null) {
-			node.log (this + " succeeded");
+			if (LOG) node.log (this + " succeeded remotely");
+			Node.succeededRemotely++;
 			node.increaseSearchRate();
 		}
 		else {
@@ -66,7 +67,8 @@ public class SskRequestHandler extends RequestHandler
 		pubKey = pk;
 		if (dataFound == null) return; // Keep waiting
 		if (prev == null) {
-			node.log (this + " succeeded");
+			if (LOG) node.log (this + " succeeded remotely");
+			Node.succeededRemotely++;
 			node.increaseSearchRate();
 		}
 		else {

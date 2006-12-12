@@ -1,7 +1,7 @@
 package sim;
 import sim.generators.SimplePublisher;
 
-class Sim
+class Sim implements EventTarget
 {
 	private final int NODES = 100; // Number of nodes
 	private final int DEGREE = 5; // Average degree
@@ -10,7 +10,7 @@ class Sim
 	private final double LATENCY = 0.1; // Latency of all links in seconds
 	private Node[] nodes;
 	
-	public Sim (double rate)
+	public void run (double rate)
 	{
 		Network.reorder = true;
 		Network.lossRate = 0.001;
@@ -36,9 +36,14 @@ class Sim
 				if (pub.addReader (nodes[index])) readers++;
 			}
 		}
+		// Reset the counters after the first hour
+		Event.schedule (this, 3600.0, RESET_COUNTERS, null);
 		// Run the simulation
 		Event.duration = 10800.0;
 		Event.run();
+		// Print the copiously detailed results
+		System.out.println (Node.succeededLocally + " "
+			+ Node.succeededRemotely + " " + Node.failed);
 	}
 	
 	// Return the lattice distance between a and b
@@ -84,6 +89,17 @@ class Sim
 		Node.useBackoff = Boolean.parseBoolean (args[2]);
 		Node.useThrottle = Boolean.parseBoolean (args[3]);
 		if (load <= 0.0) usage();
-		new Sim (load / 60.0);
+		new Sim().run (load / 60.0);
 	}
+	
+	public void handleEvent (int type, Object data)
+	{
+		if (type == RESET_COUNTERS) {
+			Node.succeededLocally = 0;
+			Node.succeededRemotely = 0;
+			Node.failed = 0;
+		}
+	}
+	
+	private final static int RESET_COUNTERS = 1;
 }

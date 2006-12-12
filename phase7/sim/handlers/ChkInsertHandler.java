@@ -116,7 +116,8 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 		if (searchState != ACCEPTED && LOG)
 			node.log (ir + " out of order");
 		if (prev == null) {
-			node.log (this + " succeeded");
+			if (LOG) node.log (this + " succeeded remotely");
+			Node.succeededRemotely++;
 			node.increaseSearchRate();
 		}
 		else prev.sendMessage (ir); // Forward the message
@@ -125,8 +126,11 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 
 	protected void sendReply()
 	{
+		// We count this as a remote success because the insert has
+		// run out of hops, so it must have left the node at some point
 		if (prev == null) {
-			node.log (this + " succeeded");
+			if (LOG) node.log (this + " succeeded remotely");
+			Node.succeededRemotely++;
 			node.increaseSearchRate();
 		}
 		else prev.sendMessage (new InsertReply (id));

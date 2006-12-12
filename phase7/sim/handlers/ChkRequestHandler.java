@@ -47,7 +47,8 @@ public class ChkRequestHandler extends RequestHandler
 		if (blocksReceived == 32) {
 			node.cacheChk (key);
 			if (prev == null) {
-				node.log (this + "succeeded");
+				if (LOG) node.log (this+ " succeeded remotely");
+				Node.succeededRemotely++;
 				node.increaseSearchRate();
 			}
 			finish();
@@ -72,7 +73,8 @@ public class ChkRequestHandler extends RequestHandler
 		if (blocksReceived == 32 && searchState == TRANSFERRING) {
 			node.cacheChk (key);
 			if (prev == null) {
-				node.log (this + " succeeded");
+				if (LOG) node.log (this+ " succeeded remotely");
+				Node.succeededRemotely++;
 				node.increaseSearchRate();
 			}
 			finish();

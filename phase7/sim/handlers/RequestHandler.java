@@ -30,14 +30,20 @@ public abstract class RequestHandler extends MessageHandler
 	{
 		if (searchState != ACCEPTED && LOG)
 			node.log (dnf + " out of order");
-		if (prev == null) node.log (this + " failed (dnf)");
+		if (prev == null) {
+			if (LOG) node.log (this + " failed (dnf)");
+			Node.failed++;
+		}
 		else prev.sendMessage (dnf); // Forward the message
 		finish();
 	}
 	
 	protected void sendReply()
 	{
-		if (prev == null) node.log (this + " failed (dnf)");
+		if (prev == null) {
+			if (LOG) node.log (this + " failed (dnf)");
+			Node.failed++;
+		}
 		else prev.sendMessage (new DataNotFound (id));
 	}
 	
@@ -57,7 +63,10 @@ public abstract class RequestHandler extends MessageHandler
 	{
 		if (searchState != TRANSFERRING) return;
 		if (LOG) node.log (this + " transfer timeout from " + p);
-		if (prev == null) node.log (this + " failed (xfer)");
+		if (prev == null) {
+			if (LOG) node.log (this + " failed (xfer)");
+			Node.failed++;
+		}
 		finish();
 	}
 	

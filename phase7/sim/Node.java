@@ -23,6 +23,11 @@ public class Node implements EventTarget
 	public final static double MAX_DELAY = 2.0; // Reject all, seconds
 	public final static double HIGH_DELAY = 1.0; // Reject some, seconds
 	
+	// Statistics (for requests and inserts combined)
+	public static int succeededLocally = 0;
+	public static int succeededRemotely = 0;
+	public static int failed = 0;
+	
 	public double location; // Routing location
 	public NetworkInterface net;
 	private HashMap<Integer,Peer> peers; // Look up a peer by its address
@@ -314,7 +319,10 @@ public class Node implements EventTarget
 		// If the data is in the store, return it
 		if (chkStore.get (r.key)) {
 			if (LOG) log ("key " + r.key + " found in CHK store");
-			if (prev == null) log (r + " succeeded locally");
+			if (prev == null) {
+				if (LOG) log (r + " succeeded locally");
+				succeededLocally++;
+			}
 			else {
 				prev.sendMessage (new ChkDataFound (r.id));
 				for (int i = 0; i < 32; i++)
@@ -327,7 +335,10 @@ public class Node implements EventTarget
 		// If the data is in the cache, return it
 		if (chkCache.get (r.key)) {
 			if (LOG) log ("key " + r.key + " found in CHK cache");
-			if (prev == null) log (r + " succeeded locally");
+			if (prev == null) {
+				if (LOG) log (r + " succeeded locally");
+				succeededLocally++;
+			}
 			else {
 				prev.sendMessage (new ChkDataFound (r.id));
 				for (int i = 0; i < 32; i++)
@@ -381,7 +392,10 @@ public class Node implements EventTarget
 		Integer data = sskStore.get (r.key);
 		if (pub && data != null) {
 			if (LOG) log ("key " + r.key + " found in SSK store");
-			if (prev == null) log (r + " succeeded locally");
+			if (prev == null) {
+				if (LOG) log (r + " succeeded locally");
+				succeededLocally++;
+			}
 			else {
 				prev.sendMessage (new SskDataFound (r.id,data));
 				if (r.needPubKey)
@@ -396,7 +410,10 @@ public class Node implements EventTarget
 		data = sskCache.get (r.key);
 		if (pub && data != null) {
 			if (LOG) log ("key " + r.key + " found in SSK cache");
-			if (prev == null) log (r + " succeeded locally");
+			if (prev == null) {
+				if (LOG) log (r + " succeeded locally");
+				succeededLocally++;
+			}
 			else {
 				prev.sendMessage (new SskDataFound (r.id,data));
 				if (r.needPubKey)
