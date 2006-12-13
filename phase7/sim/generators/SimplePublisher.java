@@ -5,9 +5,10 @@ package sim.generators;
 import sim.Event;
 import sim.EventTarget;
 import sim.Node;
+import sim.messages.*;
 import java.util.HashSet;
 
-public class SimplePublisher implements EventTarget
+public class SimplePublisher implements Client, EventTarget
 {
 	// FIXME: what fraction of keys are CHKs in real life?
 	private final static double FRACTION_CHKS = 0.5;
@@ -44,12 +45,7 @@ public class SimplePublisher implements EventTarget
 	{
 		// Insert a random key
 		int key = Node.locationToKey (Math.random());
-		node.generateChkInsert (key);
-		// Inform each reader after an average of ten minutes
-		for (Node n : readers) {
-			double delay = 595.0 + Math.random() * 10.0;
-			Event.schedule (n, delay, Node.REQUEST_CHK, key);
-		}
+		node.generateChkInsert (key, this);
 		// Schedule the next insert after an exp. distributed delay
 		if (inserts > 0 && --inserts == 0) return;
 		double delay = -Math.log (Math.random()) / rate;
@@ -60,16 +56,25 @@ public class SimplePublisher implements EventTarget
 	{
 		// Insert a random key
 		int key = Node.locationToKey (Math.random());
-		node.generateSskInsert (key, 0);
-		// Inform each reader after an average of ten minutes
-		for (Node n : readers) {
-			double delay = 595.0 + Math.random() * 10.0;
-			Event.schedule (n, delay, Node.REQUEST_SSK, key);
-		}
+		node.generateSskInsert (key, 0, this);
 		// Schedule the next insert after an exp. distributed delay
 		if (inserts > 0 && --inserts == 0) return;
 		double delay = -Math.log (Math.random()) / rate;
 		Event.schedule (this, delay, PUBLISH, null);
+	}
+	
+	// Client interface
+	
+	public void searchStarted (Search s)
+	{
+		// Inform each reader after an average of ten minutes
+		for (Node n : readers) {
+			double d = 595.0 + Math.random() * 10.0;
+			if (s instanceof ChkInsert)
+				Event.schedule (n, d, Node.REQUEST_CHK, s.key);
+			else if (s instanceof SskInsert)
+				Event.schedule (n, d, Node.REQUEST_SSK, s.key);
+		}
 	}
 	
 	// EventTarget interface

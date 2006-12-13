@@ -1,4 +1,5 @@
 package sim.messages;
+import sim.generators.Client;
 
 public class Search extends Message
 {
@@ -7,14 +8,16 @@ public class Search extends Message
 	public final int key; // The target of the search
 	public double closest; // The closest location seen so far
 	public int htl; // Hops to live for backtracking
+	public Client client; // Stored here for convenience
 	
 	// Start a new search
-	public Search (int key, double location)
+	public Search (int key, double location, Client client)
 	{
 		id = Message.nextId++;
 		this.key = key;
 		closest = location;
 		htl = MAX_HTL;
+		this.client = client;
 	}
 	
 	// Forward a search
@@ -24,6 +27,7 @@ public class Search extends Message
 		this.key = key;
 		this.closest = closest;
 		this.htl = htl;
+		client = null;
 	}
 	
 	public int size()

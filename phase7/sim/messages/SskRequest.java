@@ -7,7 +7,7 @@ public class SskRequest extends Search
 	// Start a new request
 	public SskRequest (int key, double location, boolean needPubKey)
 	{
-		super (key, location);
+		super (key, location, null);
 		this.needPubKey = needPubKey;
 	}
 	

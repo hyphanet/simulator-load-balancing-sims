@@ -1,4 +1,5 @@
 package sim;
+import sim.generators.Client;
 import sim.handlers.*;
 import sim.messages.*;
 import java.util.HashMap;
@@ -544,6 +545,8 @@ public class Node implements EventTarget
 			return;
 		}
 		Search s = searchQueue.poll();
+		// Inform the client that the search has left the queue
+		if (s.client != null) s.client.searchStarted (s);
 		if (s instanceof ChkRequest)
 			handleChkRequest ((ChkRequest) s, null);
 		else if (s instanceof ChkInsert) {
@@ -587,9 +590,9 @@ public class Node implements EventTarget
 		addToSearchQueue (cr);
 	}
 	
-	public void generateChkInsert (int key)
+	public void generateChkInsert (int key, Client c)
 	{
-		ChkInsert ci = new ChkInsert (key, location);
+		ChkInsert ci = new ChkInsert (key, location, c);
 		if (LOG) log ("generating " + ci);
 		addToSearchQueue (ci);
 	}
@@ -601,9 +604,9 @@ public class Node implements EventTarget
 		addToSearchQueue (sr);
 	}
 	
-	public void generateSskInsert (int key, int value)
+	public void generateSskInsert (int key, int value, Client c)
 	{
-		SskInsert si = new SskInsert (key, value, location);
+		SskInsert si = new SskInsert (key, value, location, c);
 		if (LOG) log ("generating " + si);
 		addToSearchQueue (si);
 	}
@@ -639,7 +642,7 @@ public class Node implements EventTarget
 			break;
 			
 			case INSERT_CHK:
-			generateChkInsert ((Integer) data);
+			generateChkInsert ((Integer) data, null);
 			break;
 			
 			case REQUEST_SSK:
@@ -647,11 +650,11 @@ public class Node implements EventTarget
 			break;
 			
 			case INSERT_SSK:
-			generateSskInsert ((Integer) data, 0);
+			generateSskInsert ((Integer) data, 0, null);
 			break;
 			
 			case SSK_COLLISION:
-			generateSskInsert ((Integer) data, 1);
+			generateSskInsert ((Integer) data, 1, null);
 			break;
 			
 			case CHECK_TIMEOUTS:

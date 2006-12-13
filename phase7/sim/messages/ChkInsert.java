@@ -1,11 +1,12 @@
 package sim.messages;
+import sim.generators.Client;
 
 public class ChkInsert extends Search
 {
 	// Start a new insert
-	public ChkInsert (int key, double location)
+	public ChkInsert (int key, double location, Client client)
 	{
-		super (key, location);
+		super (key, location, client);
 	}
 	
 	// Forward an insert

@@ -5,7 +5,7 @@ public class ChkRequest extends Search
 	// Start a new request
 	public ChkRequest (int key, double location)
 	{
-		super (key, location);
+		super (key, location, null);
 	}
 	
 	// Forward a request

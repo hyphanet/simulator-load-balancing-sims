@@ -1,13 +1,14 @@
 package sim.messages;
+import sim.generators.Client;
 
 public class SskInsert extends Search
 {
 	public final int data;
 	
 	// Start a new insert
-	public SskInsert (int key, int data, double location)
+	public SskInsert (int key, int data, double location, Client client)
 	{
-		super (key, location);
+		super (key, location, client);
 		this.data = data;
 	}
 	
