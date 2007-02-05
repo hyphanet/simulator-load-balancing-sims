@@ -1,5 +1,5 @@
 package sim;
-import sim.generators.SimplePublisher;
+import sim.clients.SimplePublisher;
 
 class Sim implements EventTarget
 {

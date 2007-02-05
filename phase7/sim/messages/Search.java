@@ -1,5 +1,5 @@
 package sim.messages;
-import sim.generators.Client;
+import sim.clients.Client;
 
 public class Search extends Message
 {

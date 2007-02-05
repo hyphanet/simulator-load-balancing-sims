@@ -1,5 +1,5 @@
 package sim;
-import sim.generators.Client;
+import sim.clients.Client;
 import sim.handlers.*;
 import sim.messages.*;
 import java.util.HashMap;

@@ -1,7 +1,7 @@
 // A simple publisher that inserts keys using a Poisson process and informs
 // each reader after an average of ten minutes
 
-package sim.generators;
+package sim.clients;
 import sim.Event;
 import sim.EventTarget;
 import sim.Node;

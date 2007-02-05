@@ -1,4 +1,4 @@
-package sim.generators;
+package sim.clients;
 import sim.messages.Search;
 
 public interface Client
