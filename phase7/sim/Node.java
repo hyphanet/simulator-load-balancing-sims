@@ -12,9 +12,6 @@ public class Node implements EventTarget
 {
 	public final static boolean LOG = false;
 	
-	// Coarse-grained retransmission timer
-	public final static double RETX_TIMER = 0.1; // Seconds
-	
 	// Flow control
 	public static boolean useTokens = false;
 	public static boolean useBackoff = false;
@@ -43,7 +40,6 @@ public class Node implements EventTarget
 	private boolean decrementMaxHtl = false;
 	private boolean decrementMinHtl = false;
 	public TokenBucket bandwidth; // Bandwidth limiter
-	private boolean timerRunning = false;
 	private int spareTokens = FLOW_TOKENS; // Tokens not allocated to a peer
 	private double delay = 0.0; // Delay caused by congestion or b/w limiter
 	private LinkedList<Search> searchQueue;
@@ -70,7 +66,7 @@ public class Node implements EventTarget
 		pubKeyCache = new LruCache<Integer> (16000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
-		bandwidth = new TokenBucket (40000, 60000);
+		bandwidth = new TokenBucket (40000, 400000);
 		searchQueue = new LinkedList<Search>();
 		if (useTokens) {
 			// Allocate flow control tokens after a short delay
@@ -228,15 +224,6 @@ public class Node implements EventTarget
 			pubKeyStore.put (key);
 		}
 		else if (LOG) log ("public key " + key + " not added to store");
-	}
-	
-	// Called by Peer to start the retransmission timer
-	public void startTimer()
-	{
-		if (timerRunning) return;
-		timerRunning = true;
-		if (LOG) log ("starting retransmission timer");
-		Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
 	}
 	
 	// Called by Peer to transmit a packet for the first time
@@ -611,17 +598,6 @@ public class Node implements EventTarget
 		addToSearchQueue (si);
 	}
 	
-	private void checkTimeouts()
-	{
-		boolean stopTimer = true;
-		for (Peer p : peers()) if (p.checkTimeouts()) stopTimer = false;
-		if (stopTimer) {
-			if (LOG) log ("stopping retransmission timer");
-			timerRunning = false;
-		}
-		else Event.schedule (this, RETX_TIMER, CHECK_TIMEOUTS, null);
-	}
-	
 	// Allocate all flow control tokens at startup
 	private void allocateTokens()
 	{
@@ -657,10 +633,6 @@ public class Node implements EventTarget
 			generateSskInsert ((Integer) data, 1, null);
 			break;
 			
-			case CHECK_TIMEOUTS:
-			checkTimeouts();
-			break;
-			
 			case ALLOCATE_TOKENS:
 			allocateTokens();
 			break;
@@ -676,7 +648,6 @@ public class Node implements EventTarget
 	public final static int REQUEST_SSK = 3;
 	public final static int INSERT_SSK = 4;
 	public final static int SSK_COLLISION = 5;
-	private final static int CHECK_TIMEOUTS = 6;
-	private final static int ALLOCATE_TOKENS = 7;
-	private final static int SEND_SEARCH = 8;
+	private final static int ALLOCATE_TOKENS = 6;
+	private final static int SEND_SEARCH = 7;
 }

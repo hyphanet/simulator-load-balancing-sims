@@ -19,9 +19,8 @@ public class Peer implements EventTarget
 	public final static double RTT_DECAY = 0.9; // Exp moving average
 	public final static double LINK_IDLE = 8.0; // RTTs without transmitting
 	
-	// Coalescing
-	public final static double MAX_DELAY = 0.1; // Max coalescing delay
-	public final static double MIN_SLEEP = 0.01; // Forty winks
+	// Retransmission/coalescing timer
+	public final static double TICK = 0.1; // Timer granularity, seconds
 	
 	// Backoff
 	public final static double INITIAL_BACKOFF = 1.0; // Seconds
@@ -39,9 +38,9 @@ public class Peer implements EventTarget
 	private DeadlineQueue<Message> searchQueue; // Outgoing search messages
 	private DeadlineQueue<Message> transferQueue; // Outgoing transfers
 	private CongestionWindow window; // AIMD congestion window
-	private double lastTransmission = Double.POSITIVE_INFINITY; // Time
+	private double lastTransmission = Double.POSITIVE_INFINITY; // Abs. time
 	private boolean tgif = false; // "Transfers go in first" toggle
-	private boolean timerRunning = false; // Coalescing timer
+	private boolean timerRunning = false; // Retransmission/coalescing timer
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -50,8 +49,8 @@ public class Peer implements EventTarget
 	// Flow control
 	private int tokensOut = 0; // How many searches can we send?
 	private int tokensIn = 0; // How many searches should we accept?
-	public double backoffUntil = 0.0; // Time
-	public double backoffLength = INITIAL_BACKOFF; // Seconds
+	public double backoffUntil = 0.0; // Absolute time, seconds
+	public double backoffLength = INITIAL_BACKOFF; // Relative time, seconds
 	
 	public Peer (Node node, int address, double location, double latency)
 	{
@@ -69,7 +68,7 @@ public class Peer implements EventTarget
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
-		m.deadline = Event.time() + MAX_DELAY;
+		m.deadline = Event.time() + TICK;
 		if (m instanceof Block) {
 			if (LOG) log (m + " added to transfer queue");
 			transferQueue.add (m);
@@ -84,13 +83,13 @@ public class Peer implements EventTarget
 		while (send (-1));
 	}
 	
-	// Start the coalescing timer
+	// Start the retransmission/coalescing timer
 	private void startTimer()
 	{
 		if (timerRunning) return;
 		timerRunning = true;
-		if (LOG) log ("starting coalescing timer");
-		Event.schedule (this, MAX_DELAY, CHECK_DEADLINES, null);
+		if (LOG) log ("starting timer");
+		Event.schedule (this, TICK, TIMER, null);
 	}
 	
 	// Try to send a packet, return true if a packet was sent
@@ -165,7 +164,7 @@ public class Peer implements EventTarget
 		if (p.messages != null) {
 			p.sent = Event.time();
 			txBuffer.add (p);
-			node.startTimer(); // Start the retransmission timer
+			startTimer(); // Start the retransmission timer
 			window.bytesSent (p.size);
 		}
 		return true;
@@ -241,8 +240,7 @@ public class Peer implements EventTarget
 		else txMaxSeq = txBuffer.peek().seq + SEQ_RANGE - 1;
 		if (LOG) log ("maximum sequence number " + txMaxSeq);
 		// Send as many packets as possible
-		if (timerRunning) while (send (-1));
-		else checkDeadlines();
+		while (send (-1));
 	}
 	
 	// When a local RejectedOverload is received, back off unless backed off
@@ -305,12 +303,19 @@ public class Peer implements EventTarget
 		return tokensIn;
 	}
 	
-	// Check retx timeouts, return true if there are packets in flight
-	public boolean checkTimeouts()
+	// Event callback: wake up, send packets, go back to sleep
+	private void timer()
 	{
-		if (LOG) log (txBuffer.size() + " packets in flight");
-		if (txBuffer.isEmpty()) return false;
-		
+		// Send as many packets as possible
+		while (send (-1));
+		// Stop the timer if there's nothing to wait for
+		if (searchQueue.size + transferQueue.size == 0
+		&& txBuffer.isEmpty()) {
+			if (LOG) log ("stopping timer");
+			timerRunning = false;
+			return;
+		}
+		// Check the retransmission timeouts
 		double now = Event.time();
 		for (Packet p : txBuffer) {
 			if (now - p.sent > RTO * rtt) {
@@ -321,55 +326,8 @@ public class Peer implements EventTarget
 				window.timeout (now);
 			}
 		}
-		return true;
-	}
-	
-	// Event callback: wake up, send packets, go back to sleep
-	private void checkDeadlines()
-	{
-		// Send as many packets as possible
-		while (send (-1));
-		// Find the next coalescing deadline - ignore message deadlines
-		// if there isn't room in the congestion window to send them
-		double dl = Double.POSITIVE_INFINITY;
-		int win = window.available() - Packet.HEADER_SIZE;
-		if (searchQueue.headSize() <= win)
-			dl = Math.min (dl, searchQueue.deadline());
-		if (transferQueue.headSize() <= win)
-			dl = Math.min (dl, transferQueue.deadline());
-		// If there's no deadline, stop the timer
-		if (dl == Double.POSITIVE_INFINITY) {
-			if (timerRunning) {
-				if (LOG) log ("stopping coalescing timer");
-				timerRunning = false;
-			}
-			return;
-		}
 		// Schedule the next check
-		double sleep = dl - Event.time();
-		if (shouldPoll()) sleep = Math.max (sleep, node.bandwidth.poll);
-		else sleep = Math.max (sleep, MIN_SLEEP);
-		timerRunning = true;
-		if (LOG) log ("sleeping for " + sleep + " seconds");
-		Event.schedule (this, sleep, CHECK_DEADLINES, null);
-	}
-	
-	// Are we waiting for the bandwidth limiter?
-	private boolean shouldPoll()
-	{
-		double bw = node.bandwidth.available();
-		double win = window.available();
-		double now = Event.time();
-		// Is there an overdue search that's waiting for bandwidth?
-		if (searchQueue.headSize() > bw
-		&& searchQueue.headSize() <= win
-		&& searchQueue.deadline() <= now) return true;
-		// Is there an overdue transfer that's waiting for bandwidth?
-		if (transferQueue.headSize() > bw
-		&& transferQueue.headSize() <= win
-		&& transferQueue.deadline() <= now) return true;
-		// We're waiting for something other than bandwidth
-		return false;
+		Event.schedule (this, TICK, TIMER, null);
 	}
 	
 	public void log (String message)
@@ -385,8 +343,8 @@ public class Peer implements EventTarget
 	// EventTarget interface
 	public void handleEvent (int type, Object data)
 	{
-		if (type == CHECK_DEADLINES) checkDeadlines();
+		if (type == TIMER) timer();
 	}
 	
-	private final static int CHECK_DEADLINES = 1;
+	private final static int TIMER = 1;
 }

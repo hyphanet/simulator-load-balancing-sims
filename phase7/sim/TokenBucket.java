@@ -2,17 +2,13 @@ package sim;
 
 class TokenBucket
 {
-	public final double rate, size, poll;
+	public final double rate, size;
 	private double tokens, lastUpdated;
 	
 	public TokenBucket (double rate, double size)
 	{
 		this.rate = rate; // Bandwidth limit in bytes per second
 		this.size = size; // Size of maximum burst in bytes
-		double poll = Packet.MAX_SIZE / rate;
-		if (poll < Peer.MIN_SLEEP) poll = Peer.MIN_SLEEP;
-		if (poll > Peer.MAX_DELAY) poll = Peer.MAX_DELAY;
-		this.poll = poll; // Polling interval in seconds
 		tokens = size;
 		lastUpdated = 0.0; // Time
 	}
