@@ -12,6 +12,9 @@ public class Node implements EventTarget
 {
 	public final static boolean LOG = false;
 	
+	// Retransmission/coalescing timer
+	public final static double TICK = 0.1; // Timer granularity, seconds
+	
 	// Flow control
 	public static boolean useTokens = false;
 	public static boolean useBackoff = false;
@@ -40,6 +43,7 @@ public class Node implements EventTarget
 	private boolean decrementMaxHtl = false;
 	private boolean decrementMinHtl = false;
 	public TokenBucket bandwidth; // Bandwidth limiter
+	private boolean timerRunning = false; // Coalescing/retransmission timer
 	private int spareTokens = FLOW_TOKENS; // Tokens not allocated to a peer
 	private double delay = 0.0; // Delay caused by congestion or b/w limiter
 	private LinkedList<Search> searchQueue;
@@ -66,7 +70,7 @@ public class Node implements EventTarget
 		pubKeyCache = new LruCache<Integer> (16000);
 		if (Math.random() < 0.5) decrementMaxHtl = true;
 		if (Math.random() < 0.25) decrementMinHtl = true;
-		bandwidth = new TokenBucket (40000, 400000);
+		bandwidth = new TokenBucket (40000, 80000);
 		searchQueue = new LinkedList<Search>();
 		if (useTokens) {
 			// Allocate flow control tokens after a short delay
@@ -501,6 +505,28 @@ public class Node implements EventTarget
 		return copy;
 	}
 	
+	// Called by Peer to start the retransmission/coalescing timer
+	public void startTimer()
+	{
+		if (timerRunning) return;
+		timerRunning = true;
+		if (LOG) log ("starting timer");
+		Event.schedule (this, TICK, TIMER, null);
+	}
+	
+	// Event callback - check retransmission/coalescing deadlines
+	private void timer()
+	{
+		boolean stopTimer = true;
+		// Check the peers in a random order for fair bandwidth sharing
+		for (Peer p : peers()) if (p.timer()) stopTimer = false;
+		if (stopTimer && timerRunning) {
+			timerRunning = false;
+			if (LOG) log ("stopping timer");
+		}
+		else Event.schedule (this, TICK, TIMER, null);
+	}
+	
 	public void log (String message)
 	{
 		Event.log (net.address + " " + message);
@@ -640,6 +666,10 @@ public class Node implements EventTarget
 			case SEND_SEARCH:
 			sendSearch();
 			break;
+			
+			case TIMER:
+			timer();
+			break;
 		}
 	}
 	
@@ -650,4 +680,5 @@ public class Node implements EventTarget
 	public final static int SSK_COLLISION = 5;
 	private final static int ALLOCATE_TOKENS = 6;
 	private final static int SEND_SEARCH = 7;
+	private final static int TIMER = 8;
 }

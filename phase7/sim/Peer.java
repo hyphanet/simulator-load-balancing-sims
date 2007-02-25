@@ -4,7 +4,7 @@ import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.HashSet;
 
-public class Peer implements EventTarget
+public class Peer
 {
 	public final static boolean LOG = false;
 	
@@ -18,9 +18,7 @@ public class Peer implements EventTarget
 	public final static double FRTO = 1.5; // Fast retx timeout in RTTs
 	public final static double RTT_DECAY = 0.9; // Exp moving average
 	public final static double LINK_IDLE = 8.0; // RTTs without transmitting
-	
-	// Retransmission/coalescing timer
-	public final static double TICK = 0.1; // Timer granularity, seconds
+	public final static double MAX_DELAY = 0.1; // Coalescing delay, seconds
 	
 	// Backoff
 	public final static double INITIAL_BACKOFF = 1.0; // Seconds
@@ -40,7 +38,6 @@ public class Peer implements EventTarget
 	private CongestionWindow window; // AIMD congestion window
 	private double lastTransmission = Double.POSITIVE_INFINITY; // Abs. time
 	private boolean tgif = false; // "Transfers go in first" toggle
-	private boolean timerRunning = false; // Retransmission/coalescing timer
 	
 	// Receiver state
 	private HashSet<Integer> rxDupe; // Detect duplicates by sequence number
@@ -68,7 +65,7 @@ public class Peer implements EventTarget
 	// Queue a message for transmission
 	public void sendMessage (Message m)
 	{
-		m.deadline = Event.time() + TICK;
+		m.deadline = Event.time() + MAX_DELAY;
 		if (m instanceof Block) {
 			if (LOG) log (m + " added to transfer queue");
 			transferQueue.add (m);
@@ -78,18 +75,9 @@ public class Peer implements EventTarget
 			searchQueue.add (m);
 		}
 		// Start the coalescing timer
-		startTimer();
+		node.startTimer();
 		// Send as many packets as possible
 		while (send (-1));
-	}
-	
-	// Start the retransmission/coalescing timer
-	private void startTimer()
-	{
-		if (timerRunning) return;
-		timerRunning = true;
-		if (LOG) log ("starting timer");
-		Event.schedule (this, TICK, TIMER, null);
 	}
 	
 	// Try to send a packet, return true if a packet was sent
@@ -164,7 +152,7 @@ public class Peer implements EventTarget
 		if (p.messages != null) {
 			p.sent = Event.time();
 			txBuffer.add (p);
-			startTimer(); // Start the retransmission timer
+			node.startTimer(); // Start the retransmission timer
 			window.bytesSent (p.size);
 		}
 		return true;
@@ -303,18 +291,14 @@ public class Peer implements EventTarget
 		return tokensIn;
 	}
 	
-	// Event callback: wake up, send packets, go back to sleep
-	private void timer()
+	// Called by Node - return true if there are messages outstanding
+	public boolean timer()
 	{
-		// Send as many packets as possible
-		while (send (-1));
 		// Stop the timer if there's nothing to wait for
 		if (searchQueue.size + transferQueue.size == 0
-		&& txBuffer.isEmpty()) {
-			if (LOG) log ("stopping timer");
-			timerRunning = false;
-			return;
-		}
+		&& txBuffer.isEmpty()) return false;
+		// Send as many packets as possible
+		while (send (-1));
 		// Check the retransmission timeouts
 		double now = Event.time();
 		for (Packet p : txBuffer) {
@@ -326,8 +310,7 @@ public class Peer implements EventTarget
 				window.timeout (now);
 			}
 		}
-		// Schedule the next check
-		Event.schedule (this, TICK, TIMER, null);
+		return true;
 	}
 	
 	public void log (String message)
@@ -339,12 +322,4 @@ public class Peer implements EventTarget
 	{
 		return Integer.toString (address);
 	}
-	
-	// EventTarget interface
-	public void handleEvent (int type, Object data)
-	{
-		if (type == TIMER) timer();
-	}
-	
-	private final static int TIMER = 1;
 }
