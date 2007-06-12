@@ -31,12 +31,15 @@ public class Event implements Comparable
 	{
 		try {
 			Event e = queue.first();
-			queue.remove (e);
+			// Return if the simulation's alloted time has run out
+			if (e.time > duration) {
+				now = duration;
+				return false;
+			}
 			// Update the clock
 			now = e.time;
-			// Quit if the simulation's alloted time has run out
-			if (now > duration) return false;
 			// Pass the packet to the target's callback method
+			queue.remove (e);
 			e.target.handleEvent (e.type, e.data);
 			return true;
 		}
@@ -65,7 +68,7 @@ public class Event implements Comparable
 		while (nextEvent()) {}
 	}
 	
-	// Non-static variables and methods for individual events
+	// Instance variables and methods for individual events
 	
 	private EventTarget target;
 	private double time;
