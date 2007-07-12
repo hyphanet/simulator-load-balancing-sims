@@ -6,57 +6,139 @@ package sim;
 import java.util.Vector;
 import java.util.LinkedList;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Random;
 
 class SimpleNode {
+
+    boolean print_steps = false;
+    Random rand;
     
     double location;
     public Vector<SimpleNode> neighbors; // Symmetric for undirected, outgoing when directed
     public Vector<SimpleNode> incoming;  // Incoming when directed
-    Random rand;
-    boolean print_steps = false;
+    public HashMap<SimpleNode,Integer> traffic_incoming;
+    public HashMap<SimpleNode,Integer> traffic_outgoing;
+    public HashMap<SimpleNode,Integer> init_local;       // Outgoing traffic, locally initiated
+    public HashMap<SimpleNode,Integer> init_remote;      // Outgoing traffic, remotely initated
+    public HashMap<SimpleNode,Integer> new_received;     // New messages received on an edge
+    public HashMap<SimpleNode,Integer> new_sent;         // New messages sent on an edge
 
     /*** stats ***/
     int load = 0;
-    int loadmem = 0;
-    int busy = 0;
-    int initiated = 0;
+    int loadmem = 0;     // Internal 
+    boolean busy = false;
+
+    /*** constants ***/
+    public static final int LOCALORIG = 0;
+    public static final int REMOTEORIG = 1;
         
     public SimpleNode(double x) {
 	this.location = x;
 	neighbors = new Vector<SimpleNode>();
 	incoming = new Vector<SimpleNode>();
+	traffic_incoming = new HashMap<SimpleNode,Integer>();
+	traffic_outgoing = new HashMap<SimpleNode,Integer>();
+	init_local = new HashMap<SimpleNode,Integer>();
+	init_remote = new HashMap<SimpleNode,Integer>();
+	new_received = new HashMap<SimpleNode,Integer>();
+	new_sent = new HashMap<SimpleNode,Integer>();
 	rand = new Random ((int) (System.currentTimeMillis() % 10000));
     }
 
-    public LinkedList<SimpleQuery> route(SimpleQuery q) {
-	load++;              // Received query from peer
+    public void load_incoming(SimpleQuery inq) {
+	load++;
 	loadmem++;
-	int htl = q.htl;     // Internal htl value
+	SimpleNode n = inq.source;
+	int type = inq.type;
+
+	// Total traffic
+	if(!traffic_incoming.containsKey(n)) {
+	    traffic_incoming.put(n, new Integer(1));
+	} else {
+	    int times = traffic_incoming.get(n).intValue();
+	    traffic_incoming.put(n, new Integer(times+1));
+	}
+
+	// Fresh traffic going to target
+	if((inq.type==SimpleQuery.FORWARD) || (inq.type==SimpleQuery.DEADEND) || (inq.type==SimpleQuery.REJECTLOOP)) {
+	    if(!new_received.containsKey(n)) {
+		new_received.put(n, new Integer(1));
+	    } else {
+		int times = new_received.get(n).intValue();
+		new_received.put(n, new Integer(times+1));
+	    }
+	}
+    }
+
+    public void load_outgoing(SimpleNode n, int srctype) {
+    	// Total traffic
+	if(!traffic_outgoing.containsKey(n)) {
+	    traffic_outgoing.put(n, new Integer(1));	    
+	} else {
+	    int times = traffic_outgoing.get(n).intValue();
+	    traffic_outgoing.put(n, new Integer(times+1));
+	}
+
+	// Local vs Remote
+	if(srctype == SimpleNode.LOCALORIG) {
+	    if(!init_local.containsKey(n)) {
+		init_local.put(n, new Integer(1));
+	    } else {
+		int times = init_local.get(n).intValue();
+		init_local.put(n, new Integer(times+1));
+	    }
+	} else {
+	    if(!init_remote.containsKey(n)) {
+		init_remote.put(n, new Integer(1));
+	    } else {
+		int times = init_remote.get(n).intValue();
+		init_remote.put(n, new Integer(times+1));
+	    }
+	}
+
+	// fixme: fresh taget going to target
+    }
+
+    public LinkedList<SimpleQuery> route(SimpleQuery q) {
+	int htl = q.htl;       // Internal htl value
+	int init;              // local or remote origin?
+	//load_incoming(q.source);
+	load_incoming(q);
+
+	if(q.source == this) {
+	    init = SimpleNode.LOCALORIG;
+	} else {
+	    init = SimpleNode.REMOTEORIG;
+	}
+
 	if(print_steps)
 	    printQueryState(htl);
 
 	LinkedList<SimpleQuery> result = new LinkedList<SimpleQuery>();
 
 	if(this.location == q.target.getLocation()) {
-	    result.addLast(new SimpleQuery(this,q.target,SimpleQuery.SUCCESS,0));
+	    result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.SUCCESS,0));
+	    load_outgoing(q.source, init);
 	    return result;
 	}
 
 	if(htl == 0) {	    
-            result.addLast(new SimpleQuery(this,q.target,SimpleQuery.HTLSTOP,0));
+            result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.HTLSTOP,0));
+	    load_outgoing(q.source, init);
 	    return result;
 	}
 
-	if(busy != 0) {
-	    result.addLast(new SimpleQuery(this,q.target,SimpleQuery.REJECTLOOP,htl-1));
+	if(busy) {
+	    result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.REJECTLOOP,htl-1));
+	    load_outgoing(q.source, init);
 	    return result;
 	}
 
-	busy = 1;
+	busy = true;
 
 	HashSet<SimpleNode> peers = new HashSet<SimpleNode>(neighbors);	
-	peers.remove(q.peer);
+	peers.remove(q.source);
 	
 	int time = 0;
 	while(htl>0) {
@@ -81,31 +163,38 @@ class SimpleNode {
 		}
 	    }
 	    
-	    if(bestpeer == null) { 	    // Dead end
-		result.addLast(new SimpleQuery(this,q.target,SimpleQuery.DEADEND,htl-1));
+	    if(bestpeer == null) {
+		result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.DEADEND,htl-1));
+		load_outgoing(q.source, init);
 		return result;
 	    }
 
-	    result.addLast(new SimpleQuery(this,q.target,SimpleQuery.FORWARD,htl-1));	
+	    result.addLast(new SimpleQuery(this,bestpeer,q.target,SimpleQuery.FORWARD,htl-1));	
 	    peers.remove(bestpeer);
 
 	    if(print_steps)
 		System.err.println("sending to " + bestpeer.getLocation() + "(attempt #"+time+")");
 
-	                  // fixme: Freenet HTL heuristic
-	    LinkedList<SimpleQuery> attempt = bestpeer.route(new SimpleQuery(this,q.target,SimpleQuery.FORWARD,htl-1));
-	    load++;       // Received answer
-	    loadmem++;
+	    // fixme: Freenet HTL heuristic
+	    load_outgoing(bestpeer, init);
+	    LinkedList<SimpleQuery> attempt = bestpeer.route(new SimpleQuery(this,bestpeer,q.target,SimpleQuery.FORWARD,htl-1));
+	    load_incoming(attempt.getLast());
+
 	    result.addAll(attempt);
 
-	    switch(attempt.getLast().type) {
-
+	    switch(attempt.getLast().type) {    	    // Did this branch succeed?
 	    case SimpleQuery.SUCCESS:		
-		result.addLast(new SimpleQuery(this,q.peer,SimpleQuery.SUCCESS,0));
+		if(q.source != this) {
+		    result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.SUCCESS,0));
+		    load_outgoing(q.source, init);
+		}
 		return result;
 		
 	    case SimpleQuery.HTLSTOP:
-		result.addLast(new SimpleQuery(this,q.peer,SimpleQuery.HTLSTOP,0));
+		if(q.source != this) {
+		    result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.HTLSTOP,0));
+		    load_outgoing(q.source, init);
+		}
 		return result;
 
 	    default:
@@ -114,10 +203,12 @@ class SimpleNode {
 	    }
 	}
 
-	result.addLast(new SimpleQuery(this,q.target,SimpleQuery.HTLSTOP,0));
+	if(q.source != this) {	    
+	    result.addLast(new SimpleQuery(this,q.source,q.target,SimpleQuery.HTLSTOP,0));
+	    load_outgoing(q.source, init);
+	}
 	return result;
     }
-
 
     public double getLocation() {
 	return location;
@@ -155,17 +246,6 @@ class SimpleNode {
 	    System.err.println("SimpleNode.connectIncoming(): source exists"); System.exit(-1);
 	}
 	incoming.add(source);
-
-    }
-
-    public void disconnect(SimpleNode target) {
-	if (target == this) {
-	    System.err.println("SimpleNode.disconnect(): disconnecting itself"); System.exit(-1);
-	}
-
-	if (!neighbors.remove(target)) {
-	    System.err.println("SimpleNode.disconnect(): neighbor not exists"); System.exit(-1);
-	}
     }
 
     public boolean hasNeighbor(SimpleNode peer) {
@@ -174,22 +254,6 @@ class SimpleNode {
 
     public int getDegree() {
 	return neighbors.size();
-    }
-
-    public void printNeighbors() {
-	System.out.print("[ ");
-	for(SimpleNode n: neighbors) {
-	    System.out.print(n.getLocation() + " ");
-	}
-	System.out.print("]");
-    }
-
-    public void printIncoming() {
-	System.out.print("I[ ");
-	for(SimpleNode n: incoming) {
-	    System.out.print(n.getLocation() + " ");
-	}
-	System.out.print("]");
     }
 
     public void printQueryState(int htl) {
