@@ -25,9 +25,11 @@ class SimpleGraph {
      * @avgdeg: average degree of nodes
      * @directed: if to have directed edges
      * @local: if to have local edges (to nearest-neighbors in the lattice)
+     * @inconst: if to have a constant number of indegree edges (when using directed edges),
+     *           else use constant outdegree
      */
 
-    public void CreateKleinbergGraph(double avgdeg, boolean directed, boolean local) {
+    public void CreateKleinbergGraph(double avgdeg, boolean directed, boolean local, boolean inconst) {
 
 	double degree;
 	if(directed) {
@@ -45,6 +47,8 @@ class SimpleGraph {
 	    }
 	}
 
+	System.err.println("Giving each node " + degree + " shortcuts" + (local ? " and nearest-neighbor connections " : "") + " (average degree="+ (local ? (avgdeg+2) : avgdeg)  +")");
+	
 	for(int i=0; i<nodes.length; i++) {
 	    SimpleNode src = nodes[i];
 
@@ -74,9 +78,16 @@ class SimpleGraph {
 		    SimpleNode dst = nodes[destpos];
 
 		    if (directed) {
-			if (!src.hasNeighbor(dst)) {
-			    found = true;
-			    src.connect(dst);
+			if (inconst) {
+			    if (!dst.hasNeighbor(src)) {
+				found = true;
+				dst.connect(src);
+			    }
+			} else {
+			    if (!src.hasNeighbor(dst)) {
+				found = true;
+				src.connect(dst);
+			    }
 			}
 		    } else {
 			if (!src.hasNeighbor(dst) && !dst.hasNeighbor(src)) {
