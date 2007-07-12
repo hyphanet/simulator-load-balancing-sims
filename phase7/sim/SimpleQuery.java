@@ -8,15 +8,18 @@ class SimpleQuery {
     public static final int REJECTLOOP=3;
     public static final int FORWARD=4;
 
-    final SimpleNode peer;
+    final SimpleNode source;
+    final SimpleNode dest;
     final SimpleNode target;
     final int type;
     int htl;
 
-    public SimpleQuery (SimpleNode peer, SimpleNode target, int type, int htl) {
-	this.peer = peer;
+    public SimpleQuery (SimpleNode source, SimpleNode dest, SimpleNode target, int type, int htl) {
+	this.source = source;
+	this.dest = dest;
 	this.target = target;
 	this.type = type;
 	this.htl = htl;
     }
+
 }
