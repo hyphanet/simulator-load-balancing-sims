@@ -1,5 +1,5 @@
 //
-// Evaluate load by greedy routing on nodes in a Kleinberg network
+// Evaluate load on nodes imposed by greedy routing in a Kleinberg network
 //
 package sim;
 
@@ -14,11 +14,19 @@ import java.text.NumberFormat;
 class EvalKleinbergLoad {
 
     final static int N = 1000;
-    final static double D = 10;            // Average degree (incl nearest-neighbors)
-    final static int HTL = N/2;            // Let all succeed for now
-    final static boolean directed = false;
+    final static double D = 12;             // Average degree (incl nearest-neighbors)
+    final static int HTL = 100;             // Let all succeed for now
+    // final static int estsize = 30;       // Size of estimation table (naive)
+    // final static int estsize = N/4;      // Size of estimation table (naive)
+    final static int estsize = 100;
+
+    final static boolean usedelays = true;
+    final static boolean learn = true;
+    final static boolean delays = true;
     final static boolean locals = false;
-    final static boolean fixinc = false;
+
+    final static boolean directed = false;
+    final static boolean fixinc = false;    
 
     final static boolean print_unsuccessfuls = false;
     final static NumberFormat fmt = NumberFormat.getInstance();
@@ -28,14 +36,31 @@ class EvalKleinbergLoad {
 	fmt.setMaximumFractionDigits(3);
 	fmt4.setMaximumFractionDigits(4);
 
-	SimpleGraph g = new SimpleGraph(N);
 	System.err.println("Network size=" + N + ", Average degree="+(int)D);
-
-	//g.CreateKleinbergGraph((int)D,true,true,true); //directed,local,fixincoming
-	//g.CreateKleinbergGraph((int)D,false,true,false); //undirected,local,outgoing
-	//g.CreateKleinbergGraph((int)D,false,false,false); //undirected,nolocal,outgoing
+	SimpleGraph g = new SimpleGraph(N, estsize, delays);
 	g.CreateKleinbergGraph((int) (locals ? (D-2) : D),directed,locals,fixinc);
-	evalGreedy(g,HTL);
+
+	g.usedelays();
+	System.err.println("Insensitive to delays, no learning:");
+	evalGreedy(g,HTL,100000,false);
+	printEstimator(g.nodes.get(0),0);
+	printEstimator(g.nodes.get(0),1);
+	printEstimator(g.nodes.get(0),2);
+
+	System.err.println("\nSensitive to delays, learning:");
+	if(learn)
+	    g.learning();
+	
+	evalGreedy(g,HTL,500000,usedelays);
+	evalGreedy(g,HTL,500000,usedelays);
+	evalGreedy(g,HTL,500000,usedelays);
+
+	printEstimator(g.nodes.get(0),0);
+	printEstimator(g.nodes.get(0),1);
+	printEstimator(g.nodes.get(0),2);
+
+	// printNeighborDistances(g.nodes[0],false);
+	// g.printNodes(1); System.exit(0);
     }
 
     /*
@@ -43,27 +68,28 @@ class EvalKleinbergLoad {
      *
      * @param g: the graph for the network
      * @param htl: hops to live for routes
+     * @nroutes: number of routes to evaluate (0=evaluate all routes)
      */
-    public static void evalGreedy(SimpleGraph g,int htl) {
-	Random rand = new Random ((int) (System.currentTimeMillis() % 10000));
-	int succ=0;
-	int routes=0;
-	int steps_target=0,steps_success=0,steps_failure=0,steps_tot=0;
+    public static void evalGreedy(SimpleGraph g,int htl,int nroutes,boolean usedelays) {
+	// Random rand = new Random ((int) (System.currentTimeMillis() % 10000));
+	int N = g.nodes.size();           // Override 
+	Random rand = new Random(System.currentTimeMillis() % 10000);
+	int succ=0,routes=0;
+	double time_target=0,steps_success=0,steps_target=0,steps_failure=0,steps_tot=0;
 	int nodes_active=0;
 	int fails_deadend=0,fails_htlstop=0,fails_rejectloop=0;
 	int netload=0;
-	int[] used_lengths = new int[N/2];
-	int[] edge_lengths = new int[N/2];
-	int n_edges=0, n_usages=0;
+	int[] used_lengths = new int[1+N/2];
+	int[] edge_lengths = new int[1+N/2];
 	int loops=0,deadends=0;
 
 	System.err.println("Routing...");
 
 	/*
 	// Test a route	
-	SimpleNode testsrc = g.nodes[0];
-	SimpleNode testtarget = g.nodes[N/2];
-	LinkedList<SimpleQuery> test = testsrc.route(new SimpleQuery(testsrc,null,testtarget,SimpleQuery.FORWARD,htl));
+	SimpleNode testsrc = g.nodes.get(0);
+	SimpleNode testtarget = g.nodes.get(N/2);
+	LinkedList<SimpleQuery> test = testsrc.route(new SimpleQuery(testsrc,null,testtarget,null,SimpleQuery.FORWARD,htl,false));
 	System.err.println("\nRouting from " + testsrc.getLocation() + " to " + testtarget.getLocation());	
 	for (SimpleQuery q : test) {
 	    if(q.type == SimpleQuery.SUCCESS) {
@@ -79,23 +105,23 @@ class EvalKleinbergLoad {
 	System.exit(0);	
 	*/
 
-	for(int i=0; i<N; i++) {
-	    for(int j=0; j<i; j++) {
-
-		SimpleNode source,target;
+	//for(int i=0; i<N; i++) {
+	//for(int j=0; j<N; j++) {
+	for(int k=0; k<1; k++) {
+	    for(int kj=0; kj<nroutes; kj++) {	
+		int i = rand.nextInt(g.nodes.size());
+		int j = rand.nextInt(g.nodes.size());
+		
 		LinkedList<SimpleQuery> route;
-		boolean found;
-		int len, load;
+		double time;
+		int steps,load;
 
-		//
 		// i -> j
-		//
-
-		source = g.nodes[i];
-		target = g.nodes[j];
-		
-		route = source.route(new SimpleQuery(source,null,target,SimpleQuery.FORWARD,htl));
-		
+		SimpleNode source = g.nodes.get(i);
+		SimpleNode target = g.nodes.get(j);		
+		route = source.route(new SimpleQuery(source,null,target,null,SimpleQuery.FORWARD,htl,false));
+		// printRoute(route);
+	       
 		switch (route.getLast().type) {
 		case SimpleQuery.SUCCESS:
 		    succ++;
@@ -103,173 +129,119 @@ class EvalKleinbergLoad {
 		    break;
 		    
 		case SimpleQuery.DEADEND:
+		    steps_failure = steps_failure + route.size();
 		    fails_deadend++;
 		    break;
 		    
 		case SimpleQuery.HTLSTOP:
+		    steps_failure = steps_failure + route.size();
 		    fails_htlstop++;
 		    break;
 		    
 		case SimpleQuery.REJECTLOOP:
+		    steps_failure = steps_failure + route.size();
 		    fails_rejectloop++;
 		    break;
 		    
 		default:
-		    steps_failure = steps_failure + route.size();
-		    if(print_unsuccessfuls) {
-			System.err.println("Unsuccessful route: ");
-			printRoute(route);
-		    }
+		    System.err.println("Route: returning with unknown state?");
+		    System.exit(0);
 		    break;
 		}
 		steps_tot = steps_tot + route.size();
 		
-		// Free nodes for queries, count steps and lengths
-		found = false;
-		len = 0;
+		// Analyze query in detail
+		boolean found = false;
+		time = 0;
+		steps = 0;
 		load = 0;
 		for(SimpleQuery q: route) {		
 
 		    int id = (int) Math.round(N*q.source.distanceTo(q.dest));
 		    used_lengths[id]++;
-		    n_usages++;
 
 		    if(!found && (q.type == SimpleQuery.SUCCESS)) {
 			found = true;
-			steps_target = steps_target + len;
+			time_target = time_target + time;
+			steps_target = steps_target + steps;
 		    } else {
-			len++;
+			if(!q.internalQuery()) {
+			    time = time + q.link.d;
+			    steps++;
+			}
 		    }
-		    
+
+		    // Count and forget
 		    if(q.source.load != 0) {
-			load = load + q.source.load;    // Forget load
+			load = load + q.source.load;
 			q.source.load = 0;
 			nodes_active++;
 		    }
 		    
-		    if(q.source.busy) {
+		    if(q.source.busy)
 			q.source.busy = false;
-		    }
 
 		    if(q.type == SimpleQuery.DEADEND)
 			deadends++;
+
 		    if(q.type == SimpleQuery.REJECTLOOP)
 			loops++;
 		}
 		netload = netload + load;
 		routes++;
 
-		//
-		// j -> i
-		//
-
-		source = g.nodes[j];
-		target = g.nodes[i];
-		
-		route = source.route(new SimpleQuery(source,null,target,SimpleQuery.FORWARD,htl));
-		
-		switch (route.getLast().type) {
-		case SimpleQuery.SUCCESS:
-		    succ++;
-		    steps_success = steps_success + route.size();
-		    break;
-		    
-		case SimpleQuery.DEADEND:
-		    fails_deadend++;
-		    break;
-		    
-		case SimpleQuery.HTLSTOP:
-		    fails_htlstop++;
-		    break;
-		    
-		case SimpleQuery.REJECTLOOP:
-		    fails_rejectloop++;
-		    break;
-		    
-		default:
-		    steps_failure = steps_failure + route.size();
-		    if(print_unsuccessfuls) {
-			System.err.println("Unsuccessful route: ");
-			printRoute(route);
-		    }
-		    break;
-		}
-		steps_tot = steps_tot + route.size();
-	      
-		// Free nodes for queries, count steps and lengths
-		found = false;
-		len = 0;
-		load = 0;
-		for(SimpleQuery q: route) {		
-
-		    int id = (int) Math.round(N*q.source.distanceTo(q.dest));
-		    used_lengths[id]++;
-		    n_usages++;
-
-		    if(!found && (q.type == SimpleQuery.SUCCESS)) {
-			found = true;
-			steps_target = steps_target + len;
-		    } else {
-			len++;
-		    }
-		    
-		    if(q.source.load != 0) {
-			load = load + q.source.load;    // Forget load
-			q.source.load = 0;
-			nodes_active++;
-		    }
-		    
-		    if(q.source.busy) {
-			q.source.busy = false;
-		    }
-
-		    if(q.type == SimpleQuery.DEADEND)
-			deadends++;
-		    if(q.type == SimpleQuery.REJECTLOOP)
-			loops++;
-		}
-		netload = netload + load;
-		routes++;
             }
 	}
 
 	double succrate = (double) succ/routes;
 	int failures = routes - succ;
-	double avglen_forward = (double) steps_target/succ;
+	double avgtime_forward = (double) time_target/succ;
+	double avgsteps_forward = (double) steps_target/succ;
 	double avglen_succ_rt = (double) steps_success/succ;
 	double avglen_failed_rt = (double) ((routes-succ) == 0 ? 0 : steps_failure/(routes-succ));
 	double avglen_all_rt = (double) steps_tot/routes;
 	double avgload_nodes = (double) netload/nodes_active;
 
+	/*
+	  // Verbose output
 	System.err.print("Result from " +routes+ " queries ");
-	System.err.println("(HTL = " + htl + ")\n");
-	
+	System.err.println("(HTL = " + htl + ")\n");	
 	System.err.println("Success Rate = " + fmt.format(succrate) + " (" + fmt.format(failures) + " failures)");
-	System.err.println("AvgLen, source to target\t" + fmt.format(avglen_forward));
-	System.err.println("AvgLen, successful roundtrips\t" + fmt.format(avglen_succ_rt));
+	System.err.println("Avg Time, source to target\t" + fmt.format(avgtime_forward));
+	System.err.println("Avg Steps, source to target\t" + fmt.format(avgsteps_forward));
+	System.err.println("Avg Steps, successful roundtr\t" + fmt.format(avglen_succ_rt));
 	System.err.println("AvgLen, failed roundtrips\t" + fmt.format(avglen_failed_rt));
 	System.err.println("AvgLen, all roundtrips\t\t" + fmt.format(avglen_all_rt));
+	*/
 
-	// Count degrees
+	/*
+	// Count in-degrees (fixme: dont depend on position->index map)
 	int[] indegree = new int[N];
 	for(int i = 0; i<N; i++) {
-	    for (SimpleNode nout: g.nodes[i].neighbors) {
+	    for (SimplePeer peer: g.nodes.get(i).neighbors) {
+		SimpleNode nout = peer.n;
 		indegree[(int)Math.round(nout.getLocation()*N)]++;
 	    }
 	}
+	*/
 
 	// Collect lengths
 	for(int i = 0; i<N; i++) {
-	    for (SimpleNode p : g.nodes[i].neighbors) {
-		edge_lengths[(int)Math.round(N*g.nodes[i].distanceTo(p))]++;
-		n_edges++;                    // directed
+	    for (SimplePeer peer : g.nodes.get(i).neighbors) {
+		SimpleNode p = peer.n;
+		edge_lengths[(int)Math.round(N*g.nodes.get(i).distanceTo(p))]++;
 	    }
 	}
 
-	System.out.println("% N="+N+",avg-degree="+D);
-	System.out.println("% " + (directed ? "directed" : "undirected") + " " + (locals ? "nearest-neighbor" : "no-nearest") + " " + (fixinc ? "fix-incoming" : ""));
-	System.out.println("% " + fmt.format(failures) + " failures," + deadends + " deadends," + loops + " loops, " + " L_target=" + fmt.format(avglen_forward) + " L_rtt=" + fmt.format(avglen_succ_rt) + " L_all=" + fmt.format(avglen_all_rt));
-	printLoadsMatlabStyle(g);
+	System.out.println(N + "\t" + fmt.format(succrate) + "\t" + fmt.format(avgtime_forward) + "\t" + fmt.format(avgsteps_forward) + "\t" + fmt.format(avglen_succ_rt) + "\t" + fmt.format(avglen_all_rt));
+
+	/*
+	  // Details for storage
+	System.out.print("% N="+g.nodes.size()+",avg-degree="+D + ","+routes + " routes" + ",HTL="+htl);
+	System.out.println(" " + (directed ? "directed" : "undirected") + " " + (locals ? "nearest-neighbor" : "no-nearest") + " " + (fixinc ? "fix-incoming" : "") + "alpha="+SimpleEstimator.alpha);
+	System.out.println("% " + fmt.format(failures) + " failures," + deadends + " deadends," + fails_rejectloop + " fail-loops (" + loops +") " + fails_htlstop + " htlstops, " + "T_target=" + fmt.format(avgtime_forward) + ",L_target=" + fmt.format(avgsteps_forward) + " L_rtt=" + fmt.format(avglen_succ_rt) + " L_all=" + fmt.format(avglen_all_rt));
+	*/
+	// printLoadsMatlabStyle(g);
     }
 
     /*
@@ -283,8 +255,9 @@ class EvalKleinbergLoad {
 	for(SimpleNode n: g.nodes) {
 	    int totload = 0;
 
-	    for(SimpleNode nn: n.incoming) {
-		printLinkLoadMatlabStyle(n,nn,g.nodes.length);
+	    for(SimplePeer peer: n.incoming) {
+		SimpleNode nn = peer.n;
+		printLinkLoadMatlabStyle(n,nn,g.nodes.size());
 
 		if(n.traffic_incoming.get(nn).intValue() != nn.traffic_outgoing.get(n).intValue()) {
 		    System.err.println("Asymmetric load: fixme :-)");
@@ -292,9 +265,10 @@ class EvalKleinbergLoad {
 		}
 	    }
 
-	    for(SimpleNode nn: n.neighbors) {
-		if(!n.incoming.contains(nn)) {
-		    printLinkLoadMatlabStyle(n,nn,g.nodes.length);
+	    for(SimplePeer peer: n.neighbors) {
+		SimpleNode nn = peer.n;
+		if(!n.hasNeighbor(nn)) {
+		    printLinkLoadMatlabStyle(n,nn,g.nodes.size());
 
 		    if(n.traffic_incoming.get(nn).intValue() != nn.traffic_outgoing.get(n).intValue()) {
 			System.err.println("Asymmetric load: fixme :-)");
@@ -302,8 +276,6 @@ class EvalKleinbergLoad {
 		    }		    
 		}
 	    }
-
-
 	}
     }
 
@@ -331,12 +303,12 @@ class EvalKleinbergLoad {
      * @param n: the node
      * @param boolean: if to only print incoming links
      */
-
     public static void printAverageNeighborDistance(SimpleNode n, boolean incoming) {
 	System.out.print("\t[");
 	double dists = 0.0;
 	if(incoming) {
-	    for(SimpleNode m: n.incoming) {
+	    for(SimplePeer peer: n.incoming) {
+		SimpleNode m = peer.n;
 		dists = dists + n.distanceTo(m);		
 	    }
 	}
@@ -366,10 +338,22 @@ class EvalKleinbergLoad {
         System.out.print("]");	
     }
 
+    /*
+     * Print distance information for each neighbor
+     *
+     * @n: node who has the neighbors
+     * @incoming: only print for incoming edges
+     */
     public static void printNeighborDistances(SimpleNode n,boolean incoming) {
 	System.out.print("[ ");
 	if(incoming) {
-	    for(SimpleNode m: n.incoming) {
+	    for(SimplePeer peer: n.incoming) {
+		SimpleNode m = peer.n;
+		System.out.print(fmt.format(n.distanceTo(m)) + " ");
+	    }
+	} else {
+	    for(SimplePeer peer: n.neighbors) {
+		SimpleNode m = peer.n;
 		System.out.print(fmt.format(n.distanceTo(m)) + " ");
 	    }
 	}
@@ -378,7 +362,8 @@ class EvalKleinbergLoad {
 
     public static void printNeighbors(SimpleNode n) {
 	System.out.print("\t[ ");
-	for(SimpleNode p: n.neighbors) {
+	for(SimplePeer peer: n.neighbors) {
+	    SimpleNode p = peer.n;
 	    System.out.print(p.getLocation() + " ");
 	}
 	System.out.print("]");
@@ -386,7 +371,8 @@ class EvalKleinbergLoad {
 
     public static void printNeighborLoad(SimpleNode n) {
 	System.out.print("\t[ ");
-	for(SimpleNode p: n.neighbors) {
+	for(SimplePeer peer: n.neighbors) {
+	    SimpleNode p = peer.n;
 	    System.out.print(n.traffic_incoming.get(p).intValue() + " ");
 	}
 	System.out.print("]");
@@ -394,12 +380,33 @@ class EvalKleinbergLoad {
 
     public static void printIncoming(SimpleNode n) {
 	System.out.print("I[ ");
-	for(SimpleNode p: n.incoming) {	    
+	for(SimplePeer peer: n.incoming) {	    
+	    SimpleNode p = peer.n;
 	    System.out.print(p.getLocation() + " ");
 	}
 	System.out.print("]");
     }
 
+    /*
+     * Print estimation information for one of the nodes
+     *
+     * @n: node who makes the estimation
+     * @i: the neighbor to print for
+     */
+    public static void printEstimator(SimpleNode n,int i) {	
+	SimpleEstimator est = n.estimators.get(n.neighbors.get(i).n);
+	System.out.println("Node at " + n.getLocation() + " estimating through " + n.neighbors.get(i).n.getLocation());
+	for(double d: est.length_times) {
+	    System.out.println(fmt.format(d) + ",");
+	}
+	System.out.println("\n\n");
+    }
+
+    /*
+     * Print information on how a route has proceeded
+     *
+     * @route: route to print about
+     */
     public static void printRoute(LinkedList<SimpleQuery> route) {	
 	boolean htlzero = false;
 	System.err.println("Round-trip from " + route.getFirst().source.getLocation() + " to " + route.getFirst().target.getLocation() + ": ");
@@ -426,7 +433,7 @@ class EvalKleinbergLoad {
 		break;
 	    }
 
-	    System.err.println("][htl="+q.htl+"][load="+q.source.load+"]");
+	    System.err.println("][htl="+q.htl+"][load="+q.source.load+"]"+ "\tdelay="+q.link.d);
 	}
 	System.err.println("");
     }
