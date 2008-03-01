@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 package sim;
 import sim.clients.Client;
 import sim.handlers.*;
@@ -636,49 +638,32 @@ public class Node implements EventTarget
 	}
 	
 	// EventTarget interface
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		switch (type) {
-			case REQUEST_CHK:
+		if (code == REQUEST_CHK)
 			generateChkRequest ((Integer) data);
-			break;
-			
-			case INSERT_CHK:
+		else if (code == INSERT_CHK)
 			generateChkInsert ((Integer) data, null);
-			break;
-			
-			case REQUEST_SSK:
+		else if (code == REQUEST_SSK)
 			generateSskRequest ((Integer) data);
-			break;
-			
-			case INSERT_SSK:
+		else if (code == INSERT_SSK)
 			generateSskInsert ((Integer) data, 0, null);
-			break;
-			
-			case SSK_COLLISION:
+		else if (code == SSK_COLLISION)
 			generateSskInsert ((Integer) data, 1, null);
-			break;
-			
-			case ALLOCATE_TOKENS:
+		else if (code == ALLOCATE_TOKENS)
 			allocateTokens();
-			break;
-			
-			case SEND_SEARCH:
+		else if (code == SEND_SEARCH)
 			sendSearch();
-			break;
-			
-			case TIMER:
+		else if (code == TIMER)
 			timer();
-			break;
-		}
 	}
 	
-	public final static int REQUEST_CHK = 1;
-	public final static int INSERT_CHK = 2;
-	public final static int REQUEST_SSK = 3;
-	public final static int INSERT_SSK = 4;
-	public final static int SSK_COLLISION = 5;
-	private final static int ALLOCATE_TOKENS = 6;
-	private final static int SEND_SEARCH = 7;
-	private final static int TIMER = 8;
+	public final static int REQUEST_CHK = Event.code();
+	public final static int INSERT_CHK = Event.code();
+	public final static int REQUEST_SSK = Event.code();
+	public final static int INSERT_SSK = Event.code();
+	public final static int SSK_COLLISION = Event.code();
+	private final static int ALLOCATE_TOKENS = Event.code();
+	private final static int SEND_SEARCH = Event.code();
+	private final static int TIMER = Event.code();
 }

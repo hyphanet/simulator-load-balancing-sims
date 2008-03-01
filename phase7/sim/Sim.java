@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 package sim;
 import sim.clients.SimplePublisher;
 
@@ -92,14 +94,14 @@ class Sim implements EventTarget
 		new Sim().run (load / 60.0);
 	}
 	
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		if (type == RESET_COUNTERS) {
+		if (code == RESET_COUNTERS) {
 			Node.succeededLocally = 0;
 			Node.succeededRemotely = 0;
 			Node.failed = 0;
 		}
 	}
 	
-	private final static int RESET_COUNTERS = 1;
+	private final static int RESET_COUNTERS = Event.code();
 }

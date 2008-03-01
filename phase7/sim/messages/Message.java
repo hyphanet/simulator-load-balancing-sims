@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // A high-level message (as opposed to a low-level packet)
 
 package sim.messages;

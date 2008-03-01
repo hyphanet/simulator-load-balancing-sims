@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // The state of an SSK insert as stored at each node along the path
 
 package sim.handlers;
@@ -161,24 +163,17 @@ public class SskInsertHandler extends MessageHandler implements EventTarget
 	}
 	
 	// EventTarget interface
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		switch (type) {
-			case KEY_TIMEOUT:
+		if (code == KEY_TIMEOUT)
 			keyTimeout();
-			break;
-			
-			case ACCEPTED_TIMEOUT:
+		else if (code == ACCEPTED_TIMEOUT)
 			acceptedTimeout ((Peer) data);
-			break;
-			
-			case SEARCH_TIMEOUT:
+		else if (code == SEARCH_TIMEOUT)
 			searchTimeout ((Peer) data);
-			break;			
-		}
 	}
 	
-	private final static int KEY_TIMEOUT = 1;
-	private final static int ACCEPTED_TIMEOUT = 2;
-	private final static int SEARCH_TIMEOUT = 3;
+	private final static int KEY_TIMEOUT = Event.code();
+	private final static int ACCEPTED_TIMEOUT = Event.code();
+	private final static int SEARCH_TIMEOUT = Event.code();
 }

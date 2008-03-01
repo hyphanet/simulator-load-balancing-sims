@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // A simple publisher that inserts keys using a Poisson process and informs
 // each reader after an average of ten minutes
 
@@ -79,10 +81,10 @@ public class SimplePublisher implements Client, EventTarget
 	
 	// EventTarget interface
 	
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		if (type == PUBLISH) publish();
+		if (code == PUBLISH) publish();
 	}
 	
-	private final static int PUBLISH = 1;
+	private final static int PUBLISH = Event.code();
 }

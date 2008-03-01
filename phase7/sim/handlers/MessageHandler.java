@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // The state of a search as stored at each node along the path
 
 package sim.handlers;

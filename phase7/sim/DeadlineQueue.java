@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // A queue storing outgoing messages and their coalescing deadlines
 
 package sim;

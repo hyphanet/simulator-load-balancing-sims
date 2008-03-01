@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // A node's low-level network interface
 
 package sim;
@@ -104,24 +106,14 @@ class NetworkInterface implements EventTarget
 	}
 	
 	// EventTarget interface
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		switch (type) {
-			case RX_QUEUE:
-			rxQueueAdd ((Packet) data);
-			break;
-			
-			case RX_END:
-			rxEnd ((Packet) data);
-			break;
-			
-			case TX_END:
-			txEnd ((Packet) data);
-			break;
-		}
+		if (code == RX_QUEUE) rxQueueAdd ((Packet) data);
+		else if (code == RX_END) rxEnd ((Packet) data);
+		else if (code == TX_END) txEnd ((Packet) data);
 	}
 	
-	public final static int RX_QUEUE = 1;
-	private final static int RX_END = 2;
-	private final static int TX_END = 3;
+	public final static int RX_QUEUE = Event.code();
+	private final static int RX_END = Event.code();
+	private final static int TX_END = Event.code();
 }

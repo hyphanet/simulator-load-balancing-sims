@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+# This software has been placed in the public domain by its author
 while (<STDIN>) {
 	split ' ';
 	print unless ($_[0] < $ARGV[0]);

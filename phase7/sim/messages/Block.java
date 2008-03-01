@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // A single block of a multi-block transfer (currently 32 blocks per transfer)
 
 package sim.messages;

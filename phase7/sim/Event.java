@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 package sim;
 import java.util.TreeSet; // Gotta love the collections framework...
 
@@ -7,8 +9,8 @@ public class Event implements Comparable
 	
 	private static TreeSet<Event> queue = new TreeSet<Event>();
 	private static double now = 0.0;
-	private static double lastLogTime = Double.POSITIVE_INFINITY;
-	private static int nextId = 0;
+	private static int nextId = 0, currentId = -1, lastLogId = -1;
+	private static int nextCode = 0; // Unique event codes
 	public static double duration = Double.POSITIVE_INFINITY;
 	public static boolean blankLine = false; // Blank line between events?
 	
@@ -16,15 +18,16 @@ public class Event implements Comparable
 	{
 		queue.clear();
 		now = 0.0;
-		lastLogTime = Double.POSITIVE_INFINITY;
 		nextId = 0;
+		currentId = -1;
+		lastLogId = -1;
 		duration = Double.POSITIVE_INFINITY;
 	}
 	
 	public static void schedule (EventTarget target, double delay,
-					int type, Object data)
+					int code, Object data)
 	{
-		queue.add (new Event (target, delay + now, type, data));
+		queue.add (new Event (target, delay + now, code, data));
 	}
 	
 	public static boolean nextEvent()
@@ -39,8 +42,9 @@ public class Event implements Comparable
 			// Update the clock
 			now = e.time;
 			// Pass the packet to the target's callback method
+			currentId = e.id;
 			queue.remove (e);
-			e.target.handleEvent (e.type, e.data);
+			e.target.handleEvent (e.code, e.data);
 			return true;
 		}
 		catch (java.util.NoSuchElementException x) {
@@ -54,11 +58,16 @@ public class Event implements Comparable
 		return now;
 	}
 	
+	public static int code()
+	{
+		return nextCode++;
+	}
+	
 	public static void log (String message)
 	{
 		// Print a blank line between events
-		if (blankLine && now > lastLogTime) System.out.println();
-		lastLogTime = now;
+		if (blankLine && currentId > lastLogId) System.out.println();
+		lastLogId = currentId;
 		System.out.print (now + " " + message + "\n");
 	}
 	
@@ -73,14 +82,14 @@ public class Event implements Comparable
 	private EventTarget target;
 	private double time;
 	private int id;
-	private int type;
+	private int code;
 	private Object data;
 	
-	private Event (EventTarget target, double time, int type, Object data)
+	private Event (EventTarget target, double time, int code, Object data)
 	{
 		this.target = target;
 		this.time = time;
-		this.type = type;
+		this.code = code;
 		this.data = data;
 		id = nextId++;
 	}

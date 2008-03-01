@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // An AIMD leaky bucket
 
 package sim;

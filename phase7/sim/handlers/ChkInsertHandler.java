@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // The state of a CHK insert as stored at each node along the path
 
 package sim.handlers;
@@ -206,34 +208,23 @@ public class ChkInsertHandler extends MessageHandler implements EventTarget
 	}
 	
 	// EventTarget interface
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		switch (type) {
-			case ACCEPTED_TIMEOUT:
+		if (code == ACCEPTED_TIMEOUT)
 			acceptedTimeout ((Peer) data);
-			break;
-			
-			case SEARCH_TIMEOUT:
+		else if (code == SEARCH_TIMEOUT)
 			searchTimeout ((Peer) data);
-			break;
-			
-			case DATA_TIMEOUT:
+		else if (code == DATA_TIMEOUT)
 			dataTimeout();
-			break;
-			
-			case TRANSFER_IN_TIMEOUT:
+		else if (code == TRANSFER_IN_TIMEOUT)
 			transferInTimeout();
-			break;
-			
-			case TRANSFER_OUT_TIMEOUT:
+		else if (code == TRANSFER_OUT_TIMEOUT)
 			transferOutTimeout ((Peer) data);
-			break;
-		}
 	}
 	
-	private final static int ACCEPTED_TIMEOUT = 1;
-	private final static int SEARCH_TIMEOUT = 2;
-	private final static int DATA_TIMEOUT = 3;
-	private final static int TRANSFER_IN_TIMEOUT = 4;
-	private final static int TRANSFER_OUT_TIMEOUT = 5;
+	private final static int ACCEPTED_TIMEOUT = Event.code();
+	private final static int SEARCH_TIMEOUT = Event.code();
+	private final static int DATA_TIMEOUT = Event.code();
+	private final static int TRANSFER_IN_TIMEOUT = Event.code();
+	private final static int TRANSFER_OUT_TIMEOUT = Event.code();
 }

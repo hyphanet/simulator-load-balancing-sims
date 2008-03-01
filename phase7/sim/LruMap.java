@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // Limited-capacity LRU cache that stores a value for each key
 
 package sim;

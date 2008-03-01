@@ -1,3 +1,5 @@
+// This software has been placed in the public domain by its author
+
 // The parent class of ChkRequestHandler and SskRequestHandler
 
 package sim.handlers;
@@ -71,24 +73,17 @@ public abstract class RequestHandler extends MessageHandler
 	}
 	
 	// EventTarget interface
-	public void handleEvent (int type, Object data)
+	public void handleEvent (int code, Object data)
 	{
-		switch (type) {
-			case ACCEPTED_TIMEOUT:
+		if (code == ACCEPTED_TIMEOUT)
 			acceptedTimeout ((Peer) data);
-			break;
-			
-			case SEARCH_TIMEOUT:
+		else if (code == SEARCH_TIMEOUT)
 			searchTimeout ((Peer) data);
-			break;
-			
-			case TRANSFER_TIMEOUT:
+		else if (code == TRANSFER_TIMEOUT)
 			transferTimeout ((Peer) data);
-			break;
-		}
 	}
 	
-	protected final static int ACCEPTED_TIMEOUT = 1;
-	protected final static int SEARCH_TIMEOUT = 2;
-	protected final static int TRANSFER_TIMEOUT = 3;
+	protected final static int ACCEPTED_TIMEOUT = Event.code();
+	protected final static int SEARCH_TIMEOUT = Event.code();
+	protected final static int TRANSFER_TIMEOUT = Event.code();
 }
